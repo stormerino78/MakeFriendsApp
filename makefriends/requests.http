@@ -1,0 +1,42 @@
+POST http://127.0.0.1:8000/register/
+Content-Type: application/json
+
+{"username":"kfbdjx","email":"hdr@jevd.fr","password":"1","name":"Good gdvc","dateOfBirth_str":"2025-03-09","gender":"homme","interests":"","personality":"","why":""}
+###
+
+POST http://127.0.0.1:8000/api/events
+Content-Type: application/json
+
+{
+	"title": "Casual Meetup",
+	"description": "I want to go grab a coffee, join me",
+	"date": "2025-03-10T18:00:00Z",
+	"location": "Downtown Cafe",
+	"type": "Social",
+	"age_range": "20-35",
+	"gender_preference": "All"
+}
+
+###
+
+POST http://127.0.0.1:8000/token/
+Content-Type: application/json
+
+{
+    "username": "jacki_beismurth",
+    "password": "securepassword123"
+}
+
+###
+GET http://127.0.0.1:8000/api/users/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxMjU1NDI1LCJpYXQiOjE3NDEyNTUxMjUsImp0aSI6ImMwYTMxYjhmNDQ0OTRiMDM4YTgzZTRmOTBlOWMyNGUzIiwidXNlcl9pZCI6MX0.Lom1y-JgsZ2zegSgPbcpsFNtFRo2BflZY5CkVNTql0E
+
+###
+Get http://192.168.1.11:8000/api/users/me/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxNzMwOTcyLCJpYXQiOjE3NDE3MzA2NzIsImp0aSI6ImJmOTdiYWFmZTVkMDRmMjY5YWQyNzMwN2U2YzYzNjBjIiwidXNlcl9pZCI6MX0.ee3tlLfaccZdl6IS921HQQ0_iU6AzeOnKOEYvDidLDg
+
+###
+Get http://192.168.1.11:8000/token/refresh
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxNzMwOTcyLCJpYXQiOjE3NDE3MzA2NzIsImp0aSI6ImJmOTdiYWFmZTVkMDRmMjY5YWQyNzMwN2U2YzYzNjBjIiwidXNlcl9pZCI6MX0.ee3tlLfaccZdl6IS921HQQ0_iU6AzeOnKOEYvDidLDg
