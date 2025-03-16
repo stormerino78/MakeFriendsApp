@@ -13,20 +13,21 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import Modal from 'react-native-modal';
 import { Ionicons } from '@expo/vector-icons';
+import CustomMarker from '../CustomMarker';
 
 // Get the device's screen dimensions.
 const { width, height } = Dimensions.get('window');
 
 // Define the initial position for the map view.
 const INITIAL_REGION = {
-  latitude: 37.78825,
-  longitude: -122.4324,
+  latitude: 48.78825,
+  longitude: 7.4324,
   latitudeDelta: 0.0922,
   longitudeDelta: 0.0421,
 };
 
 // Define a TypeScript type for markers that can represent events or people.
-type MarkerType = {
+export type MarkerType = {
   id: string;
   type: 'event' | 'person'; // Indicates whether the marker is an event or a person.
   mood: string; // Friendship mood: Chat, Activity Partner, Business, or Open.
@@ -99,6 +100,7 @@ const MainScreen = () => {
   const [filterOption, setFilterOption] = useState<string | null>(null);
   // Selected marker (for the bottom card)
   const [selectedMarker, setSelectedMarker] = useState<MarkerType | null>(null);
+  const [currentRegion, setCurrentRegion] = useState(INITIAL_REGION);
 
   const router = useRouter();
 
@@ -114,6 +116,11 @@ const MainScreen = () => {
       setUserLocation(location.coords);
     })();
   }, []);
+
+    // Update current region on map region change.
+    const handleRegionChangeComplete = (region: any) => {
+      setCurrentRegion(region);
+    };
 
   // Filter and sort markers whenever filter settings change
   useEffect(() => {
@@ -174,6 +181,13 @@ const MainScreen = () => {
     setShowFilter(false);
   };
 
+  // Compute Markers size based on current region's latitudeDelta
+  // When zooming out the latitudeDelta increases and so scale becomes smaller.
+  const baseSize = 16;
+  const factor = currentRegion ? INITIAL_REGION.latitudeDelta / currentRegion.latitudeDelta : 1;
+  // Marker size between 2 and 40 pixels.
+  const markerSize = Math.max(2, Math.min(baseSize * factor, 40));
+
   return (
     <View style={styles.container}>
       {/* --- Top Friendship Mood Selector --- */}
@@ -209,15 +223,17 @@ const MainScreen = () => {
 
       {/* --- Bar with View Toggle and Filter Button --- */}
       <View style={styles.viewFilterBar}>
-        {/* View Toggle: List and Map buttons */}
-        <View style={styles.viewToggle}>
+        <View style={styles.viewToggleContainer}>
           <TouchableOpacity
-            style={[
-              styles.viewButton,
-              viewMode === 'list' && styles.activeViewButton,
-            ]}
+            style={styles.viewButton}
             onPress={() => setViewMode('list')}
           >
+            <Ionicons
+              name="list-outline"
+              size={20}
+              color={viewMode === 'list' ? '#4287f5' : '#333'}
+              style={styles.viewIcon}
+            />
             <Text
               style={[
                 styles.viewButtonText,
@@ -227,30 +243,41 @@ const MainScreen = () => {
               List
             </Text>
           </TouchableOpacity>
+
+          {/* Vertical divider */}
+          <View style={styles.divider} />
+
           <TouchableOpacity
-            style={[
-              styles.viewButton,
-              viewMode === 'map' && styles.activeViewButton,
-            ]}
+            style={styles.viewButton}
             onPress={() => setViewMode('map')}
           >
+            <Ionicons
+              name="map-outline"
+              size={20}
+              color={viewMode === 'map' ? '#4287f5' : '#333'}
+              style={styles.viewIcon}
+            />
             <Text
               style={[
                 styles.viewButtonText,
                 viewMode === 'map' && styles.activeViewButtonText,
               ]}
             >
-              Map
+              Carte
             </Text>
           </TouchableOpacity>
         </View>
-        {/* Filter Icon Button */}
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setShowFilter(!showFilter)}
-        >
-          <Ionicons name="filter-circle-outline" size={32} />
-        </TouchableOpacity>
+
+        {/* Filter Section with Label and Icon */}
+        <View style={styles.filterContainer}>
+          <Text style={styles.filterLabel}>Filtrer</Text>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setShowFilter(!showFilter)}
+          >
+            <Ionicons name="filter-circle-outline" size={34} color="#4287f5" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* --- Bottom-Sheet-Style Modal (react-native-modal) --- */}
@@ -273,41 +300,80 @@ const MainScreen = () => {
             }}
             style={styles.modalOptionRow}
           >
-            <Ionicons name="close-circle-outline" size={16} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>Aucun</Text>
+            <View style={styles.checkIconContainer}>
+              {sortOption === null && filterOption === null && (
+                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
+              )}
+            </View>
+            <Ionicons name="close-circle-outline" size={24} color="#333" style={styles.optionIcon} />
+            <Text style={styles.optionText}>None</Text>
           </TouchableOpacity>
 
-          {/* Sort options */}
           <TouchableOpacity onPress={() => handleSort('alphabetical')} style={styles.modalOptionRow}>
-            <Ionicons name="list-outline" size={16} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>Alphabetiquement</Text>
+            <View style={styles.checkIconContainer}>
+              {sortOption === 'alphabetical' && (
+                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
+              )}
+            </View>
+            <Ionicons name="list-outline" size={24} color="#333" style={styles.optionIcon} />
+            <Text style={styles.optionText}>Alphabetically</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleSort('oldest')} style={styles.modalOptionRow}>
-            <Ionicons name="arrow-up-outline" size={16} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>Du + ancien au + récent</Text>
+            <View style={styles.checkIconContainer}>
+              {sortOption === 'oldest' && (
+                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
+              )}
+            </View>
+            <Ionicons name="arrow-up-outline" size={24} color="#333" style={styles.optionIcon} />
+            <Text style={styles.optionText}>Oldest to Newest</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleSort('newest')} style={styles.modalOptionRow}>
-            <Ionicons name="arrow-down-outline" size={16} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>Du + récent au + ancien</Text>
+            <View style={styles.checkIconContainer}>
+              {sortOption === 'newest' && (
+                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
+              )}
+            </View>
+            <Ionicons name="arrow-down-outline" size={24} color="#333" style={styles.optionIcon} />
+            <Text style={styles.optionText}>Newest to Oldest</Text>
           </TouchableOpacity>
 
-          <Text style={[styles.modalTitle, { marginTop: 15 }]}>Filtrer</Text>
-          {/* Filter options */}
+          {/* Filter Section */}
+          <Text style={[styles.modalTitle, { marginTop: 15 }]}>Filtrer par</Text>
           <TouchableOpacity onPress={() => handleFilter('sport')} style={styles.modalOptionRow}>
-            <Ionicons name="football-outline" size={16} color="#333" style={styles.optionIcon} />
+            <View style={styles.checkIconContainer}>
+              {filterOption === 'sport' && (
+                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
+              )}
+            </View>
+            <Ionicons name="football-outline" size={24} color="#333" style={styles.optionIcon} />
             <Text style={styles.optionText}>Sport</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleFilter('cultural')} style={styles.modalOptionRow}>
-            <Ionicons name="color-palette-outline" size={16} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>Culturel</Text>
+            <View style={styles.checkIconContainer}>
+              {filterOption === 'cultural' && (
+                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
+              )}
+            </View>
+            <Ionicons name="color-palette-outline" size={24} color="#333" style={styles.optionIcon} />
+            <Text style={styles.optionText}>Cultural</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleFilter('activity')} style={styles.modalOptionRow}>
-            <Ionicons name="briefcase-outline" size={16} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>Activité</Text>
+            <View style={styles.checkIconContainer}>
+              {filterOption === 'activity' && (
+                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
+              )}
+            </View>
+            <Ionicons name="briefcase-outline" size={24} color="#333" style={styles.optionIcon} />
+            <Text style={styles.optionText}>Activity</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleFilter('online')} style={styles.modalOptionRow}>
-            <Ionicons name="wifi-outline" size={16} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>En ligne</Text>
+            <View style={styles.checkIconContainer}>
+              {filterOption === 'online' && (
+                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
+              )}
+            </View>
+            <Ionicons name="wifi-outline" size={24} color="#333" style={styles.optionIcon} />
+            <Text style={styles.optionText}>Online</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -329,12 +395,13 @@ const MainScreen = () => {
               <Marker
                 key={marker.id}
                 coordinate={marker.coordinates}
-                pinColor={
-                  marker.type === 'event'
-                    ? getEventColor(marker.eventType)
-                    : getPersonColor(marker.personMood)
-                }
+                
                 onPress={() => setSelectedMarker(marker)}
+                image={
+                  marker.type === 'event'
+                    ? require('../../../assets/images/event_ticket_icon.png')
+                    : require('../../../assets/images/person_icon.png')
+                }
               />
             ))}
           </MapView>
@@ -355,8 +422,8 @@ const MainScreen = () => {
         </View>
       )}
 
-      {/* --- Bottom Card for Selected Marker --- */}
-      {selectedMarker && (
+      {/* --- Bottom Card for Selected Marker only in the map view --- */}
+      {viewMode === 'map' && selectedMarker && (
         <View style={styles.bottomCard}>
           <Text style={styles.cardTitle}>{selectedMarker.title}</Text>
           <Text style={styles.cardDescription}>{selectedMarker.description}</Text>
@@ -370,35 +437,6 @@ const MainScreen = () => {
       )}
     </View>
   );
-};
-
-// Helper Functions for Marker Colors
-const getEventColor = (eventType?: string) => {
-  switch (eventType) {
-    case 'sport':
-      return 'green';
-    case 'cultural':
-      return 'purple';
-    case 'activity':
-      return 'orange';
-    case 'online':
-      return 'blue';
-    default:
-      return 'red';
-  }
-};
-
-const getPersonColor = (personMood?: string) => {
-  switch (personMood) {
-    case 'quick chat':
-      return 'yellow';
-    case 'deep talk':
-      return 'brown';
-    case 'professional':
-      return 'gray';
-    default:
-      return 'black';
-  }
 };
 
 const styles = StyleSheet.create({
@@ -439,6 +477,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 15,
   },
+  viewToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 50,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    marginRight: 10,
+    alignSelf: 'center',
+  },
   viewFilterBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -451,31 +498,70 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   viewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 5,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 3,
-    marginRight: 5,
   },
   activeViewButton: {
     backgroundColor: '#4287f5',
     borderColor: '#4287f5',
   },
   viewButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#333',
+    padding: 5,
+  },
+  customMarker: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    // Optional shadow or border for visibility:
+    borderWidth: 1,
+    borderColor: '#fff',
+    // You can also add elevation for Android or shadow for iOS:
+    elevation: 2,
+  },
+  markerTypeText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: 'bold',
   },
   activeViewButtonText: {
-    color: '#fff',
+    color: '#4287f5',
   },
   filterButton: {
     backgroundColor: '#fff',
     borderRadius: 50,
   },
+  checkIconContainer: {
+    width: 20, // fixed width container for the check icon
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
   // react-native-modal bottom style
   bottomModal: {
     margin: 0,
     justifyContent: 'flex-end', // to appear from bottom
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  filterLabel: {
+    fontSize: 14,
+    color: '#333',
+    marginRight: 5,
+  },
+  markerContainer: {
+    // Optionally adjust the container styling if needed.
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerImage: {
+    width: 40,  // Set desired width
+    height: 40, // Set desired height
+    resizeMode: 'contain',
   },
   fullWidthModal: {
     backgroundColor: '#fff',
@@ -541,6 +627,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 4,
+  },
+  // Icon for each view button, with a little left margin
+  viewIcon: {
+    marginLeft: 5,
+  },
+  // Vertical divider between the two view buttons
+  divider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#ccc',
+    marginHorizontal: 10,
   },
   cardDescription: {
     fontSize: 14,
