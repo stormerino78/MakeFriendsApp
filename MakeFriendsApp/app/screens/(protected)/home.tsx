@@ -103,48 +103,51 @@ const HomeScreen = () => {
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   // 2) Fetch events from the backend
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        // Assure the user is logged in
-        const token = await AsyncStorage.getItem('access_token');
-        if (!token) {
-          Alert.alert("Error", "Not logged in");
-          router.push('/');
-          return;
-        }
-        // GET request to the events endpoint with the authentification token
-        const response = await fetch("http://192.168.1.11:8000/api/events/", {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
-        });
-        if (!response.ok) {
-          Alert.alert("Error", "Failed to fetch events from backend");
-          return;
-        }
-        const data = await response.json();
-        // Transform each event into a MarkerType
-        const eventMarkers: MarkerType[] = data.map((evt: any) => ({
-          id: String(evt.id),
-          title: evt.title,
-          description: evt.description,
-          date: evt.date,
-          coordinates: {
-            latitude: evt.latitude,
-            longitude: evt.longitude,
-          },
-          eventType: evt.event_type,
-          age_range: evt.age_range,
-          gender_preference: evt.gender_preference,
-        }));
-        setMarkers(eventMarkers);
-      } catch (error) {
-        Alert.alert("Error", String(error));
+  const fetchEvents = async () => {
+    try {
+      // Assure the user is logged in
+      const token = await AsyncStorage.getItem('access_token');
+      if (!token) {
+        Alert.alert("Error", "Not logged in");
+        router.push('/');
+        return;
       }
-    };
+      // GET request to the events endpoint with the authentification token
+      const response = await fetch("http://192.168.1.11:8000/api/events/", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        Alert.alert("Error", "Failed to fetch events from backend");
+        return;
+      }
+      const data = await response.json();
+      // Transform each event into a MarkerType
+      const eventMarkers: MarkerType[] = data.map((evt: any) => ({
+        id: String(evt.id),
+        title: evt.title,
+        description: evt.description,
+        date: evt.date,
+        coordinates: {
+          latitude: evt.latitude,
+          longitude: evt.longitude,
+        },
+        eventType: evt.event_type,
+        age_range: evt.age_range,
+        gender_preference: evt.gender_preference,
+      }));
+      setMarkers(eventMarkers);
+    } catch (error) {
+      Alert.alert("Error", String(error));
+    }
+  };
 
+  // Fetch events on mount and set up polling
+  useEffect(() => {
     fetchEvents();
+    const interval = setInterval(fetchEvents, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
   }, []);
 
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -158,7 +161,7 @@ const HomeScreen = () => {
         marker.description.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesSearch;
     });
-
+  
     // Sort
     let sorted = [...filtered];
     if (sortOption === 'alphabetical') {
@@ -168,7 +171,7 @@ const HomeScreen = () => {
     } else if (sortOption === 'newest') {
       sorted.sort((a, b) => Number(b.id) - Number(a.id));
     }
-
+  
     // Additional filter if filterOption is set ('sport', 'online')
     if (filterOption) {
       sorted = sorted.filter(marker => {
@@ -179,7 +182,7 @@ const HomeScreen = () => {
       });
     }
     setFilteredMarkers(sorted);
-  }, [selectedMood, searchQuery, sortOption, filterOption]);
+  }, [markers, searchQuery, sortOption, filterOption]);
 
   // Update current region on map region change.
   const handleRegionChangeComplete = (region: any) => {
@@ -225,8 +228,8 @@ const HomeScreen = () => {
       title: newTitle,
       description: newDescription,
       date: newDate.toISOString(), // backend expects ISO string
-      latitude: coords.latitude,
-      longitude: coords.longitude,
+      latitude: coords.latitude || null,
+      longitude: coords.longitude || null,
       event_type: newEventType,
       age_range: newAgeRange || null,
       gender_preference: newGenderPreference || null,
@@ -643,17 +646,19 @@ const HomeScreen = () => {
               <Picker.Item label="NETWORKING" value="networking" />
             </Picker>
           </View>
-          {/* Button to launch location picker */}
-          <TouchableOpacity
-            style={styles.selectLocationButton}
-            onPress={() => setShowLocationPickerModal(true)}
-          >
-            <Text style={styles.selectLocationText}>
-              {newEventCoordinates
-                ? `Location: (${newEventCoordinates.latitude.toFixed(4)}, ${newEventCoordinates.longitude.toFixed(4)})`
-                : "Select Location"}
-            </Text>
-          </TouchableOpacity>
+          {/* Button to launch location picker, no location for online events */}
+          {newEventType !== 'online' && (
+            <TouchableOpacity
+              style={styles.selectLocationButton}
+              onPress={() => setShowLocationPickerModal(true)}
+            >
+              <Text style={styles.selectLocationText}>
+                {newEventCoordinates
+                  ? `Location: (${newEventCoordinates.latitude.toFixed(4)}, ${newEventCoordinates.longitude.toFixed(4)})`
+                  : "Select Location"}
+              </Text>
+            </TouchableOpacity>
+          )}
           {/* Optional fields */}
           <TextInput
             style={styles.input}
