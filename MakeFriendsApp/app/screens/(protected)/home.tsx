@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   TextInput,
   Dimensions,
+  Platform,
   Alert,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
@@ -13,7 +14,9 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import Modal from 'react-native-modal';
 import { Ionicons } from '@expo/vector-icons';
-import CustomMarker from '../CustomMarker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
 
 // Get the device's screen dimensions.
 const { width, height } = Dimensions.get('window');
@@ -29,63 +32,26 @@ const INITIAL_REGION = {
 // Define a TypeScript type for markers that can represent events or people.
 export type MarkerType = {
   id: string;
-  type: 'event' | 'person'; // Indicates whether the marker is an event or a person.
-  mood: string; // Friendship mood: Chat, Activity Partner, Business, or Open.
-  coordinates: { latitude: number; longitude: number };
   title: string;
   description: string;
-  date?: string;       // Optional: date of event
-  image?: string;      // Optional: image of event
-  eventType?: string;  // Optional: type of event
-  personMood?: string; // Optional: mood for people
+  date: string; // Optional: date of event
+  coordinates: { latitude: number; longitude: number };
+  eventType: string;  // Optional: type of event
+  age_range?: string; // Optional: date of the event
+  gender_preference?: string; // Optional: gender preference for the event
 };
 
-// Dummy marker data testing
-const dummyMarkers: MarkerType[] = [
-  {
-    id: '1',
-    type: 'event',
-    mood: 'Chat',
-    coordinates: { latitude: 48.575147, longitude: 7.752592 },
-    title: 'Quick Chat Meetup',
-    description: 'Join for a quick chat!',
-    eventType: 'online',
-  },
-  {
-    id: '2',
-    type: 'event',
-    mood: 'Activity Partner',
-    coordinates: { latitude: 48.578962, longitude: 7.761605 },
-    title: 'Hiking Adventure',
-    description: 'Looking for a partner for a hike',
-    eventType: 'sport',
-  },
-  {
-    id: '3',
-    type: 'person',
-    mood: 'Business',
-    coordinates: { latitude: 48.563107, longitude: 7.761999 },
-    title: 'Jane Smith',
-    description: 'Professional networking',
-    personMood: 'professional',
-  },
-  {
-    id: '4',
-    type: 'person',
-    mood: 'Open',
-    coordinates: { latitude: 48.539024, longitude: 7.736038 },
-    title: 'John Doe',
-    description: 'Open to all connections',
-    personMood: 'deep talk',
-  },
-];
+const HomeScreen = () => {
+  const router = useRouter();
 
-const MainScreen = () => {
+  // State for events/people markers
+  const [markers, setMarkers] = useState<MarkerType[]>([]);
+
   // Friendship mood state from the top bar (default Open)
   const [selectedMood, setSelectedMood] = useState('Open');
   const [searchQuery, setSearchQuery] = useState('');
   // Filter the markers displayed on the map (initially all)
-  const [filteredMarkers, setFilteredMarkers] = useState<MarkerType[]>(dummyMarkers);
+  const [filteredMarkers, setFilteredMarkers] = useState<MarkerType[]>([]);
   // State for the user's current location (latitude & longitude).
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   // Ref for the MapView to animate the map to the user's location
@@ -102,9 +68,26 @@ const MainScreen = () => {
   const [selectedMarker, setSelectedMarker] = useState<MarkerType | null>(null);
   const [currentRegion, setCurrentRegion] = useState(INITIAL_REGION);
 
-  const router = useRouter();
+  const [showFABMenu, setShowFABMenu] = useState(false);
+  const [showCreateEventModal, setShowCreateEventModal] = useState(false);
 
-  // Get user's location when the component mounts
+  // Form states for new event creation
+  const [newTitle, setNewTitle] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newDate, setNewDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [newEventType, setNewEventType] = useState('');
+  // Optional fields
+  const [newAgeRange, setNewAgeRange] = useState('');
+  const [newGenderPreference, setNewGenderPreference] = useState('');
+
+  // Pïck the location of the event
+  const [newEventCoordinates, setNewEventCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [showLocationPickerModal, setShowLocationPickerModal] = useState(false);
+
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+  // 1) On mount request location permission and get user location
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -116,22 +99,64 @@ const MainScreen = () => {
       setUserLocation(location.coords);
     })();
   }, []);
+  
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-    // Update current region on map region change.
-    const handleRegionChangeComplete = (region: any) => {
-      setCurrentRegion(region);
+  // 2) Fetch events from the backend
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        // Assure the user is logged in
+        const token = await AsyncStorage.getItem('access_token');
+        if (!token) {
+          Alert.alert("Error", "Not logged in");
+          router.push('/');
+          return;
+        }
+        // GET request to the events endpoint with the authentification token
+        const response = await fetch("http://192.168.1.11:8000/api/events/", {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        if (!response.ok) {
+          Alert.alert("Error", "Failed to fetch events from backend");
+          return;
+        }
+        const data = await response.json();
+        // Transform each event into a MarkerType
+        const eventMarkers: MarkerType[] = data.map((evt: any) => ({
+          id: String(evt.id),
+          title: evt.title,
+          description: evt.description,
+          date: evt.date,
+          coordinates: {
+            latitude: evt.latitude,
+            longitude: evt.longitude,
+          },
+          eventType: evt.event_type,
+          age_range: evt.age_range,
+          gender_preference: evt.gender_preference,
+        }));
+        setMarkers(eventMarkers);
+      } catch (error) {
+        Alert.alert("Error", String(error));
+      }
     };
 
-  // Filter and sort markers whenever filter settings change
+    fetchEvents();
+  }, []);
+
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+  // 3) Filter & sort markers
   useEffect(() => {
-    // Filter by mood and search
-    const filtered = dummyMarkers.filter(marker => {
-      const matchesMood =
-        selectedMood === 'Open' || marker.mood.toLowerCase() === selectedMood.toLowerCase();
+    // Filter search
+    const filtered = markers.filter(marker => {
       const matchesSearch =
         marker.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         marker.description.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesMood && matchesSearch;
+      return matchesSearch;
     });
 
     // Sort
@@ -144,10 +169,10 @@ const MainScreen = () => {
       sorted.sort((a, b) => Number(b.id) - Number(a.id));
     }
 
-    // Additional filter if filterOption is set (e.g., 'sport', 'online', etc.)
+    // Additional filter if filterOption is set ('sport', 'online')
     if (filterOption) {
       sorted = sorted.filter(marker => {
-        if (marker.type === 'event' && marker.eventType) {
+        if (marker.eventType) {
           return marker.eventType.toLowerCase() === filterOption.toLowerCase();
         }
         return true;
@@ -156,9 +181,9 @@ const MainScreen = () => {
     setFilteredMarkers(sorted);
   }, [selectedMood, searchQuery, sortOption, filterOption]);
 
-  // Join event logic
-  const handleJoinEvent = (marker: MarkerType) => {
-    Alert.alert('Join Event', `You have joined the event: ${marker.title}`);
+  // Update current region on map region change.
+  const handleRegionChangeComplete = (region: any) => {
+    setCurrentRegion(region);
   };
 
   // Sort handler
@@ -181,16 +206,107 @@ const MainScreen = () => {
     setShowFilter(false);
   };
 
-  // Compute Markers size based on current region's latitudeDelta
-  // When zooming out the latitudeDelta increases and so scale becomes smaller.
-  const baseSize = 16;
-  const factor = currentRegion ? INITIAL_REGION.latitudeDelta / currentRegion.latitudeDelta : 1;
-  // Marker size between 2 and 40 pixels.
-  const markerSize = Math.max(2, Math.min(baseSize * factor, 40));
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+  // Handle Publish of new event
+  const handlePublishEvent = async () => {
+    // Validate required fields
+    if (!newTitle.trim() || !newDescription.trim() || !newDate) {
+      Alert.alert("Missing Fields", "Please fill in all required fields.");
+      return;
+    }
+    // Use the selected event location if set or use currentRegion
+    const coords = newEventCoordinates || currentRegion;
+    if (!coords) {
+      Alert.alert("Error", "Unable to determine event location.");
+      return;
+    }
+    const eventData = {
+      title: newTitle,
+      description: newDescription,
+      date: newDate.toISOString(), // backend expects ISO string
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      event_type: newEventType,
+      age_range: newAgeRange || null,
+      gender_preference: newGenderPreference || null,
+    };
+
+    try {
+      const token = await AsyncStorage.getItem('access_token');
+      if (!token) {
+        Alert.alert("Error", "Not logged in");
+        router.push('/');
+        return;
+      }
+      const response = await fetch("http://192.168.1.11:8000/api/events/", {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(eventData),
+      });
+      if (response.ok) {
+        Alert.alert("Success", "Event created successfully.");
+        // Optionally, refresh events list:
+        const createdEvent = await response.json();
+        setMarkers(prev => [...prev, {
+          id: String(createdEvent.id),
+          title: createdEvent.title,
+          description: createdEvent.description,
+          date: createdEvent.date,
+          coordinates: { latitude: createdEvent.latitude, longitude: createdEvent.longitude },
+          eventType: createdEvent.event_type,
+          age_range: createdEvent.age_range,
+          gender_preference: createdEvent.gender_preference,
+        }]);
+
+        // Reset form fields and close modal/menu
+        setNewTitle('');
+        setNewDescription('');
+        setNewDate(new Date());
+        setNewEventCoordinates(null);
+        setNewEventType('sport');
+        setNewAgeRange('');
+        setNewGenderPreference('');
+        setShowCreateEventModal(false);
+        setShowFABMenu(false);
+      } else {
+        const errorData = await response.json();
+        Alert.alert("Publish Failed", JSON.stringify(errorData));
+      }
+    } catch (error) {
+      Alert.alert("Error", String(error));
+    }
+  };
+
+  // Date picker handler for new event date
+  const handleNewDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios'); // For Android hide after selection
+    if (selectedDate) {
+      setNewDate(selectedDate);
+    }
+  };
+
+  // Handler for tapping on the location picker map.
+  const handleMapPressForLocation = (e: any) => {
+    const { coordinate } = e.nativeEvent;
+    setNewEventCoordinates(coordinate);
+  };
+
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+  // Join event logic
+  const handleJoinEvent = (marker: MarkerType) => {
+    Alert.alert('Join Event', `You have joined the event: ${marker.title}`);
+  };
+
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   return (
     <View style={styles.container}>
-      {/* --- Top Friendship Mood Selector --- */}
+      {/* --- Top Friendship Mood Selector --- 
       <View style={styles.moodContainer}>
         {['Chat', 'Activity Partner', 'Business', 'Open'].map(mood => (
           <TouchableOpacity
@@ -212,6 +328,7 @@ const MainScreen = () => {
           </TouchableOpacity>
         ))}
       </View>
+      */}
 
       {/* --- Search Bar --- */}
       <TextInput
@@ -354,17 +471,17 @@ const MainScreen = () => {
                 <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
               )}
             </View>
-            <Ionicons name="color-palette-outline" size={24} color="#333" style={styles.optionIcon} />
+            <Ionicons name="ticket-outline" size={24} color="#333" style={styles.optionIcon} />
             <Text style={styles.optionText}>Cultural</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleFilter('activity')} style={styles.modalOptionRow}>
+          <TouchableOpacity onPress={() => handleFilter('networking')} style={styles.modalOptionRow}>
             <View style={styles.checkIconContainer}>
-              {filterOption === 'activity' && (
+              {filterOption === 'networking' && (
                 <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
               )}
             </View>
             <Ionicons name="briefcase-outline" size={24} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>Activity</Text>
+            <Text style={styles.optionText}>Networking</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleFilter('online')} style={styles.modalOptionRow}>
             <View style={styles.checkIconContainer}>
@@ -389,18 +506,24 @@ const MainScreen = () => {
                 ? { ...userLocation, latitudeDelta: 0.0922, longitudeDelta: 0.0421 }
                 : INITIAL_REGION
             }
+            onRegionChangeComplete={handleRegionChangeComplete}
             showsUserLocation={true}
           >
             {filteredMarkers.map(marker => (
               <Marker
                 key={marker.id}
                 coordinate={marker.coordinates}
-                
                 onPress={() => setSelectedMarker(marker)}
                 image={
-                  marker.type === 'event'
-                    ? require('../../../assets/images/event_ticket_icon.png')
-                    : require('../../../assets/images/person_icon.png')
+                  marker.eventType === 'cultural'
+                    ? require('../../../assets/images/cultural_icon.png')
+                    : marker.eventType === 'sport'
+                    ? require('../../../assets/images/sport_icon.png')
+                    : marker.eventType === 'online'
+                    ? require('../../../assets/images/online_icon.png')
+                    : marker.eventType === 'networking'
+                    ? require('../../../assets/images/networking_icon.png')
+                    : require('../../../assets/images/event_icon.png')
                 }
               />
             ))}
@@ -413,28 +536,171 @@ const MainScreen = () => {
             <TouchableOpacity
               key={marker.id}
               style={styles.listItem}
-              onPress={() => marker.type === 'event' && handleJoinEvent(marker)}
+              onPress={() => handleJoinEvent(marker)}
             >
               <Text style={styles.listTitle}>{marker.title}</Text>
               <Text style={styles.listDescription}>{marker.description}</Text>
+              <Text style={styles.cardDescription}>Type: {marker.eventType}</Text>
+              <Text style={styles.cardDescription}>Date: {marker.date}</Text>
             </TouchableOpacity>
           ))}
         </View>
       )}
-
       {/* --- Bottom Card for Selected Marker only in the map view --- */}
       {viewMode === 'map' && selectedMarker && (
         <View style={styles.bottomCard}>
           <Text style={styles.cardTitle}>{selectedMarker.title}</Text>
           <Text style={styles.cardDescription}>{selectedMarker.description}</Text>
-          {selectedMarker.date && (
-            <Text style={styles.cardInfo}>Date: {selectedMarker.date}</Text>
+          <Text style={styles.cardDescription}>Type: {selectedMarker.eventType}</Text>
+          <Text style={styles.cardDescription}>Date: {selectedMarker.date}</Text>
+          {selectedMarker.age_range && (
+            <Text style={styles.cardDescription}>
+              Age Range: {selectedMarker.age_range}
+            </Text>
+          )}
+          {selectedMarker.gender_preference && (
+            <Text style={styles.cardDescription}>
+              Gender Pref: {selectedMarker.gender_preference}
+            </Text>
           )}
           <TouchableOpacity onPress={() => setSelectedMarker(null)}>
             <Text style={styles.closeButton}>Close</Text>
           </TouchableOpacity>
         </View>
       )}
+      {/* Floating Action Button (FAB) */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setShowFABMenu(!showFABMenu)}
+      >
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
+
+      {/* FAB Menu (appears above the FAB when toggled) */}
+      {showFABMenu && (
+        <View style={styles.fabMenu}>
+          <TouchableOpacity
+            style={styles.fabMenuItem}
+            onPress={() => {
+              setShowCreateEventModal(true);
+              setShowFABMenu(false);
+            }}
+          >
+            <Text style={styles.fabMenuText}>Create Event</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Modal for Creating New Event */}
+      <Modal
+        isVisible={showCreateEventModal}
+        onBackdropPress={() => setShowCreateEventModal(false)}
+      >
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Create New Event</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Title"
+            value={newTitle}
+            onChangeText={setNewTitle}
+          />
+          <TextInput
+            style={[styles.input, { height: 80 }]}
+            placeholder="Description"
+            value={newDescription}
+            onChangeText={setNewDescription}
+            multiline
+          />
+          <TouchableOpacity
+            style={styles.datePickerButton}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Ionicons name="calendar-outline" size={24} color="#333" style={styles.optionIcon} />
+            <Text style={styles.datePickerText}>
+              {`${newDate.toISOString().split('T')[0]}`}
+            </Text>
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={newDate}
+              mode="date"
+              display="default"
+              onChange={handleNewDateChange}
+              minimumDate={new Date()}
+            />
+          )}
+          {/* Drop-down for Event Type */}
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={newEventType}
+              onValueChange={(itemValue) => setNewEventType(itemValue)}
+              style={styles.picker}
+            >
+              <Picker.Item label="SELECT" value={null} />
+              <Picker.Item label="SPORT" value="sport" />
+              <Picker.Item label="ONLINE" value="online" />
+              <Picker.Item label="CULTURAL" value="cultural" />
+              <Picker.Item label="NETWORKING" value="networking" />
+            </Picker>
+          </View>
+          {/* Button to launch location picker */}
+          <TouchableOpacity
+            style={styles.selectLocationButton}
+            onPress={() => setShowLocationPickerModal(true)}
+          >
+            <Text style={styles.selectLocationText}>
+              {newEventCoordinates
+                ? `Location: (${newEventCoordinates.latitude.toFixed(4)}, ${newEventCoordinates.longitude.toFixed(4)})`
+                : "Select Location"}
+            </Text>
+          </TouchableOpacity>
+          {/* Optional fields */}
+          <TextInput
+            style={styles.input}
+            placeholder="Age Range (optional)"
+            value={newAgeRange}
+            onChangeText={setNewAgeRange}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Gender Preference (optional)"
+            value={newGenderPreference}
+            onChangeText={setNewGenderPreference}
+          />
+          <TouchableOpacity style={styles.publishButton} onPress={handlePublishEvent}>
+            <Text style={styles.publishButtonText}>Publish</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+      {/* Modal for Location Picker */}
+      <Modal
+        isVisible={showLocationPickerModal}
+        onBackdropPress={() => setShowLocationPickerModal(false)}
+        style={styles.locationModal}
+      >
+        <View style={styles.locationModalContent}>
+          <Text style={styles.modalTitle}>Select Event Location</Text>
+          <MapView
+            style={styles.locationMap}
+            initialRegion={
+              userLocation
+                ? { ...userLocation, latitudeDelta: 0.0922, longitudeDelta: 0.0421 }
+                : INITIAL_REGION
+            }
+            onPress={handleMapPressForLocation}
+          >
+            {newEventCoordinates && (
+              <Marker coordinate={newEventCoordinates} />
+            )}
+          </MapView>
+          <TouchableOpacity
+            style={styles.confirmLocationButton}
+            onPress={() => setShowLocationPickerModal(false)}
+          >
+            <Text style={styles.confirmLocationText}>Confirm Location</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -571,10 +837,58 @@ const styles = StyleSheet.create({
     padding: 16,
     maxHeight: '70%',    // optional limit
   },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    backgroundColor: '#4287f5',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+  },
+  fabMenu: {
+    position: 'absolute',
+    bottom: 90,
+    right: 20,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    elevation: 5,
+  },
+  fabMenuItem: {
+    padding: 10,
+  },
+  fabMenuText: {
+    fontSize: 16,
+    color: '#4287f5',
+  },
   modalTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 12,
+  },
+  pickerContainer: {
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 5,
+    marginBottom: 15,
+  },
+  picker: {
+    height: 50,
+    width: '100%',
+    fontSize: 14,
+  },
+  locationModal: {
+    margin: 0,
+    justifyContent: 'center',
+  },
+  locationModalContent: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    height: height * 0.6,
   },
   modalOptionRow: {
     flexDirection: 'row',
@@ -653,6 +967,61 @@ const styles = StyleSheet.create({
     color: '#4287f5',
     marginTop: 8,
   },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+  },
+  input: {
+    height: 40,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 5,
+    marginVertical: 6,
+    paddingHorizontal: 10,
+  },
+  datePickerButton: {
+    height: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 5,
+    marginVertical: 6,
+    paddingHorizontal: 10,
+  },
+  datePickerText: {
+    fontSize: 14,
+  },
+  publishButton: {
+    backgroundColor: '#4287f5',
+    padding: 12,
+    borderRadius: 5,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  publishButtonText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  selectLocationButton: {
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ddd',
+    borderRadius: 5,
+    marginVertical: 6,
+  },
+  selectLocationText: { fontSize: 14, color: '#333' },
+  locationMap: { flex: 1, borderRadius: 12 },
+  confirmLocationButton: {
+    backgroundColor: '#4287f5',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  confirmLocationText: { color: '#fff', fontSize: 16 },
 });
 
-export default MainScreen;
+export default HomeScreen;
