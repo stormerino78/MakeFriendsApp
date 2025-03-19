@@ -7,8 +7,8 @@ class Event(models.Model):
 	title = models.CharField(max_length=255)
 	description = models.TextField()
 	date = models.DateTimeField()
-	latitude = models.FloatField()
-	longitude = models.FloatField()
+	latitude = models.FloatField(blank=True, null=True)
+	longitude = models.FloatField(blank=True, null=True)
 	event_type = models.CharField(max_length=50) #"sport", "online", "cultural", "networking"
 	age_range = models.CharField(max_length=20, blank=True, null=True)
 	gender_preference = models.CharField(max_length=20, blank=True, null=True)
