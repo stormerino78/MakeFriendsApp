@@ -36,6 +36,7 @@ const AccountScreen = () => {
   const [why, setWhy] = useState('');
   // State for the profile picture URI; will hold the image file path
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [mood, setMood] = useState('');
 
   // Fetch the current user profile from the backend when the component mounts
   useEffect(() => {
@@ -71,6 +72,7 @@ const AccountScreen = () => {
           setInterests(data.interests || '');
           setPersonality(data.personality || '');
           setWhy(data.why || '');
+          setMood(data.mood || '');
           if (data.profile_picture) {
             setProfilePicture(data.profile_picture);
           }
@@ -130,7 +132,7 @@ const AccountScreen = () => {
     formData.append('interests', interests);
     formData.append('personality', personality);
     formData.append('why', why);
-    
+    formData.append('mood', mood);
     // Append profile pic to the form data as a file.
     if (profilePicture) {
       let localUri = profilePicture;
@@ -273,7 +275,19 @@ const AccountScreen = () => {
           <Picker.Item label="Extravert" value="Extravert" />
         </Picker>
       </View>
-
+      
+      {/* New Picker for Mood */}
+      <Text style={styles.label}>Friendship Mood</Text>
+      <View style={styles.pickerContainer}>
+        <Picker selectedValue={mood} style={styles.picker} onValueChange={(itemValue) => setMood(itemValue)}>
+          <Picker.Item label="None" value="" />
+          <Picker.Item label="Casual chat" value="casual chat" />
+          <Picker.Item label="Looking for a deep talk" value="deep talk" />
+          <Picker.Item label="Activity partner" value="activity partner" />
+          <Picker.Item label="Networking" value="networking" />
+          <Picker.Item label="New to town" value="new to town" />
+        </Picker>
+      </View>
       {/* Input for Why */}
       <Text style={styles.label}>Why are you on the app?</Text>
       <TextInput

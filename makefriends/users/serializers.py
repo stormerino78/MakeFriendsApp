@@ -18,6 +18,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     interests = serializers.CharField(required=False, allow_blank=True)
     why = serializers.CharField(required=False, allow_blank=True)
     personality = serializers.CharField(required=False, allow_blank=True)
+    mood = serializers.CharField(required=False, allow_blank=True)
     
 
     class Meta:
@@ -32,7 +33,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "interests", 
             "personality",
             "why",
-            "profile_picture"
+            "profile_picture",
+            "mood"
         ]
 
     def validate_username(self, value):

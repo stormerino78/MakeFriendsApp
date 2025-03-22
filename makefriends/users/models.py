@@ -1,6 +1,14 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+MOOD_CHOICES = [
+    ('casual chat', 'Casual chat'),
+    ('deep talk', 'Looking for a deep talk'),
+    ('activity partner', 'Activity partner'),
+    ('networking', 'Networking'),
+    ('new to town', 'New to town'),
+]
+
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')  # Correctly link to the User model
     name = models.CharField(max_length=50)
@@ -10,6 +18,7 @@ class UserProfile(models.Model):
     personality = models.TextField(blank=True, null=True)
     why = models.TextField(blank=True, null=True)
     profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
+    mood = models.CharField(max_length=50, choices=MOOD_CHOICES, blank=True, null=True)
 
     def __str__(self):
         return self.user.username  # Using the related User model's username
