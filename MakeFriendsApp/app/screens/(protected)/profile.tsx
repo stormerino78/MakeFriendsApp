@@ -3,8 +3,9 @@ import { FlatList, TouchableOpacity, Text, StyleSheet, View, SafeAreaView, Image
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import config from './config.json';
 
-const BACKEND_URL = "http://192.168.1.11:8000";
+const BACKEND_URL = config.url;
 
 type MenuItem = {
   key: string;

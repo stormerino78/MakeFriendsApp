@@ -5,8 +5,9 @@ import { useRouter } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import config from './(protected)/config.json';
 
-const BACKEND_URL = "http://192.168.1.11:8000";
+const BACKEND_URL = config.url;
 
 const RegistrationScreen = () => {
   // Get all the data from the user

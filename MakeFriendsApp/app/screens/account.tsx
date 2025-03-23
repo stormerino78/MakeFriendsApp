@@ -16,8 +16,9 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import config from './(protected)/config.json';
 
-const BACKEND_URL = "http://192.168.1.11:8000";
+const BACKEND_URL = config.url;
 
 const AccountScreen = () => {
   // Get router for navigation

@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import config from './(protected)/config.json';
 
-const BACKEND_URL = "http://192.168.1.11:8000";
+const BACKEND_URL = config.url;
 
 const LoginScreen = () => {
   // Get the login credentials
@@ -32,8 +33,8 @@ const LoginScreen = () => {
         // Save the token for the next requests to remain authentificated through asyncStorage
         await AsyncStorage.setItem('access_token', data.access);
         console.log("Login successful, token saved:", data.access);
-        // Navigate to the Home screen.
-        router.push('/screens/(protected)/home');
+        // Navigate to the poke screen.
+        router.push('/screens/(protected)/poke');
       } else {
         console.error("Login error:", data);
         Alert.alert("Login failed", JSON.stringify(data));

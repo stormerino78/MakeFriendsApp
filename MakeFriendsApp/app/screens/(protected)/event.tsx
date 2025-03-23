@@ -17,6 +17,9 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
+import config from './config.json';
+
+const BACKEND_URL = config.url;
 
 // Get the device's screen dimensions.
 const { width, height } = Dimensions.get('window');
@@ -113,7 +116,7 @@ const HomeScreen = () => {
         return;
       }
       // GET request to the events endpoint with the authentification token
-      const response = await fetch("http://192.168.1.11:8000/api/events/", {
+      const response = await fetch(`${BACKEND_URL}/api/events/`, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -242,7 +245,7 @@ const HomeScreen = () => {
         router.push('/');
         return;
       }
-      const response = await fetch("http://192.168.1.11:8000/api/events/", {
+      const response = await fetch(`${BACKEND_URL}/api/events/`, {
         method: 'POST',
         headers: {
           "Content-Type": "application/json",
