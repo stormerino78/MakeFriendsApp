@@ -13,12 +13,15 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import config from './config.json';
+
+const BACKEND_URL = config.url;
 
 type NearbyUser = {
   id: string;
   name: string;
   profilePicture?: string;
-  friendshipMood: string;
+  mood: string;
   coordinates: { latitude: number; longitude: number };
   visible: boolean;
 };
@@ -29,7 +32,7 @@ const dummyNearbyUsers: NearbyUser[] = [
     id: '1', 
     name: 'Alice', 
     profilePicture: 'https://via.placeholder.com/100', 
-    friendshipMood: 'Casual chat', 
+    mood: 'Casual chat', 
     coordinates: { latitude: 48.575147, longitude: 7.752592 }, 
     visible: true 
   },
@@ -37,7 +40,7 @@ const dummyNearbyUsers: NearbyUser[] = [
     id: '2', 
     name: 'Bob', 
     profilePicture: 'https://via.placeholder.com/100', 
-    friendshipMood: 'Looking for a deep talk', 
+    mood: 'Looking for a deep talk', 
     coordinates: { latitude: 48.578962, longitude: 7.761605 }, 
     visible: true 
   },
@@ -45,34 +48,17 @@ const dummyNearbyUsers: NearbyUser[] = [
     id: '3', 
     name: 'Charlie', 
     profilePicture: 'https://via.placeholder.com/100', 
-    friendshipMood: 'Activity partner', 
+    mood: 'Activity partner', 
     coordinates: { latitude: 48.563107, longitude: 7.761999 }, 
     visible: true 
   },
 ];
 
-// Helper function: Haversine formula to compute distance in km.
-const getDistanceFromLatLonInKm = (
-  lat1: number, lon1: number, lat2: number, lon2: number
-) => {
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
-
 const PokeScreen = () => {
   const router = useRouter();
   const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
-  const [transparentMode, setTransparentMode] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [userMood, setUserMood] = useState<string>("");
 
   useEffect(() => {
     (async () => {
@@ -91,53 +77,103 @@ const PokeScreen = () => {
     })();
   }, []);
 
+  // Fetch current user's profile to get their friendship mood
   useEffect(() => {
-    // For demo purposes, using dummy data. Later, fetch from backend.
-    setNearbyUsers(dummyNearbyUsers.filter(user => user.visible));
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem('access_token');
+        if (!token) {
+          Alert.alert("Error", "Not logged in");
+          router.push('/screens/login');
+          return;
+        }
+        const response = await fetch(`${BACKEND_URL}/api/users/me/`, {
+          method: 'GET',
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          // Set the user's mood (ensure it is in lowercase for consistent comparison)
+          setUserMood((data.mood || "").toLowerCase());
+        } else {
+          Alert.alert("Error", "Failed to fetch profile");
+        }
+      } catch (error: any) {
+        Alert.alert("Error", error.toString());
+      }
+    })();
   }, []);
+
+  useEffect(() => {
+    let filtered = dummyNearbyUsers.filter(user => user.visible);
+    if (userMood) {
+      filtered = filtered.filter(user => user.mood.toLowerCase() === userMood);
+    }
+    setNearbyUsers(filtered);
+  }, [userMood]);
 
   const handlePoke = (user: NearbyUser) => {
     Alert.alert("Poke Sent", `You have poked ${user.name}`);
     // Implement actual poke logic with backend
   };
 
-// Render each nearby user item, including the distance.
-const renderUserItem = ({ item }: { item: NearbyUser }) => {
-  // Calculate distance if userLocation is available.
-  let distanceText = "";
-  if (userLocation) {
-    const distance = getDistanceFromLatLonInKm(
-      userLocation.latitude,
-      userLocation.longitude,
-      item.coordinates.latitude,
-      item.coordinates.longitude
-    );
-    distanceText = `${distance.toFixed(1)} km away`;
-  }
-  return (
-    <View style={styles.userItem}>
-      {item.profilePicture ? (
-        <Image source={{ uri: item.profilePicture }} style={styles.userImage} />
-      ) : (
-        <View style={[styles.userImage, styles.userPlaceholder]}>
-          <Text style={styles.userPlaceholderText}>{item.name.charAt(0)}</Text>
-        </View>
-      )}
-      <View style={styles.userInfo}>
-        <Text style={styles.userName}>{item.name}</Text>
-        <Text style={styles.userMood}>{item.friendshipMood}</Text>
-        {distanceText !== "" && (
-          <Text style={styles.userDistance}>{distanceText}</Text>
+  // Helper function: Haversine formula to compute distance in km.
+  const getDistanceFromLatLonInKm = (
+    lat1: number, lon1: number, lat2: number, lon2: number
+  ) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) *
+        Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Render each nearby user item, including the distance.
+  const renderUserItem = ({ item }: { item: NearbyUser }) => {
+    // Calculate distance if userLocation is available.
+    let distanceText = "";
+    if (userLocation) {
+      const distance = getDistanceFromLatLonInKm(
+        userLocation.latitude,
+        userLocation.longitude,
+        item.coordinates.latitude,
+        item.coordinates.longitude
+      );
+      distanceText = `${distance.toFixed(1)} km`;
+    }
+    return (
+      <View style={styles.userItem}>
+        {item.profilePicture ? (
+          <Image source={{ uri: item.profilePicture }} style={styles.userImage} />
+        ) : (
+          <View style={[styles.userImage, styles.userPlaceholder]}>
+            <Text style={styles.userPlaceholderText}>{item.name.charAt(0)}</Text>
+          </View>
         )}
+        <View style={styles.userInfo}>
+          <Text style={styles.userName}>{item.name}</Text>
+          <Text style={styles.userMood}>{item.mood}</Text>
+          {distanceText !== "" && (
+            <Text style={styles.userDistance}>{distanceText}</Text>
+          )}
+        </View>
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.pokeButton} onPress={() => handlePoke(item)}>
+            <Text style={styles.pokeButtonText}>Poke</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.pokeButton} onPress={() => handlePoke(item)}>
-          <Text style={styles.pokeButtonText}>Poke</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-};
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -147,16 +183,6 @@ const renderUserItem = ({ item }: { item: NearbyUser }) => {
         <TouchableOpacity onPress={() => router.push('/screens/chat')}>
           <Ionicons name="chatbubble-ellipses-outline" size={28} color="#fff" />
         </TouchableOpacity>
-      </View>
-
-      {/* Transparent Mode Toggle */}
-      <View style={styles.transparentContainer}>
-        <Text style={styles.transparentLabel}>Transparent Mode</Text>
-        <Switch 
-          value={transparentMode} 
-          onValueChange={setTransparentMode} 
-          trackColor={{ false: '#ccc', true: '#4287f5' }}
-        />
       </View>
 
       {/* List of nearby users */}
