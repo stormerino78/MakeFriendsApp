@@ -18,66 +18,72 @@ import config from './config.json';
 const BACKEND_URL = config.url;
 
 type NearbyUser = {
-  id: string;
+  user_id: number;
   name: string;
-  profilePicture?: string;
+  profile_picture?: string;
   mood: string;
-  coordinates: { latitude: number; longitude: number };
-  visible: boolean;
+  location_display?: {
+    type: string;
+    coordinates: [number, number];
+  };
 };
-
-// Updated dummy data using the new type
-const dummyNearbyUsers: NearbyUser[] = [
-  { 
-    id: '1', 
-    name: 'Alice', 
-    profilePicture: 'https://via.placeholder.com/100', 
-    mood: 'Casual chat', 
-    coordinates: { latitude: 48.575147, longitude: 7.752592 }, 
-    visible: true 
-  },
-  { 
-    id: '2', 
-    name: 'Bob', 
-    profilePicture: 'https://via.placeholder.com/100', 
-    mood: 'Looking for a deep talk', 
-    coordinates: { latitude: 48.578962, longitude: 7.761605 }, 
-    visible: true 
-  },
-  { 
-    id: '3', 
-    name: 'Charlie', 
-    profilePicture: 'https://via.placeholder.com/100', 
-    mood: 'Activity partner', 
-    coordinates: { latitude: 48.563107, longitude: 7.761999 }, 
-    visible: true 
-  },
-];
 
 const PokeScreen = () => {
   const router = useRouter();
   const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [userMood, setUserMood] = useState<string>("");
+  const [transparentMode, setTransparentMode] = useState(false);
 
+  // Get user's current location
   useEffect(() => {
     (async () => {
-      // Request location permission
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert("Permission Denied", "Location permission was denied");
         return;
       }
-      // Get current user position and update state
       const location = await Location.getCurrentPositionAsync({});
-      setUserLocation({
+      const coords = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
-      });
+      };
+      setUserLocation(coords);
+  
+      // Update user profile with current location
+      try {
+        const token = await AsyncStorage.getItem('access_token');
+        if (!token) {
+          Alert.alert("Error", "Not logged in");
+          router.push('/screens/login');
+          return;
+        }
+        const patchResponse = await fetch(`${BACKEND_URL}/api/users/me/`, {
+          method: 'PATCH',
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            location: {
+              type: "Point",
+              coordinates: [coords.longitude, coords.latitude]
+            }
+          }),
+        });
+        if (!patchResponse.ok) {
+          const errText = await patchResponse.text();
+          console.error("Failed to update location on profile", patchResponse.status, errText);
+        } else {
+          console.log("Location updated successfully");
+        }
+      } catch (error: any) {
+        console.error("Error updating location:", error);
+      }
     })();
   }, []);
-
-  // Fetch current user's profile to get their friendship mood
+  
+  // Fetch the current user's profile to get their mood
   useEffect(() => {
     (async () => {
       try {
@@ -96,7 +102,6 @@ const PokeScreen = () => {
         });
         if (response.ok) {
           const data = await response.json();
-          // Set the user's mood (ensure it is in lowercase for consistent comparison)
           setUserMood((data.mood || "").toLowerCase());
         } else {
           Alert.alert("Error", "Failed to fetch profile");
@@ -107,20 +112,43 @@ const PokeScreen = () => {
     })();
   }, []);
 
+  // Fetch nearby users from backend
   useEffect(() => {
-    let filtered = dummyNearbyUsers.filter(user => user.visible);
-    if (userMood) {
-      filtered = filtered.filter(user => user.mood.toLowerCase() === userMood);
-    }
-    setNearbyUsers(filtered);
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem('access_token');
+        if (!token) {
+          Alert.alert("Error", "Not logged in");
+          router.push('/screens/login');
+          return;
+        }
+        // Assuming your backend has an endpoint for nearby users.
+        // You might want to pass the current location as query parameters.
+        const response = await fetch(`${BACKEND_URL}/api/nearby-users/`, {
+          method: 'GET',
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+        if (response.ok) {
+          const data: NearbyUser[] = await response.json();
+          let filtered = data;
+          // Optionally filter by mood if set
+          if (userMood) {
+            filtered = filtered.filter(user => user.mood.toLowerCase() === userMood);
+          }
+          setNearbyUsers(filtered);
+        } else {
+          Alert.alert("Error", "Failed to fetch nearby users");
+        }
+      } catch (error: any) {
+        Alert.alert("Error", error.toString());
+      }
+    })();
   }, [userMood]);
 
-  const handlePoke = (user: NearbyUser) => {
-    Alert.alert("Poke Sent", `You have poked ${user.name}`);
-    // Implement actual poke logic with backend
-  };
-
-  // Helper function: Haversine formula to compute distance in km.
+  // Helper function: Haversine formula for distance in km.
   const getDistanceFromLatLonInKm = (
     lat1: number, lon1: number, lat2: number, lon2: number
   ) => {
@@ -130,30 +158,63 @@ const PokeScreen = () => {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(lat1 * (Math.PI / 180)) *
-        Math.cos(lat2 * (Math.PI / 180)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
 
-  // Render each nearby user item, including the distance.
+  const handlePoke = async (user: NearbyUser) => {
+    try {
+      const token = await AsyncStorage.getItem('access_token');
+      if (!token) {
+        Alert.alert("Error", "Not logged in");
+        router.push('/screens/login');
+        return;
+      }
+      const response = await fetch(`${BACKEND_URL}/api/poke/`, {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ target_id: user.user_id })  // use user_id instead of id
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setNearbyUsers(prev => prev.filter(u => u.user_id !== user.user_id));
+        router.push('/screens/chat');
+      } else {
+        Alert.alert("Error", "Failed to send poke");
+      }
+    } catch (error: any) {
+      Alert.alert("Error", error.toString());
+    }
+  };
+
   const renderUserItem = ({ item }: { item: NearbyUser }) => {
-    // Calculate distance if userLocation is available.
     let distanceText = "";
-    if (userLocation) {
+    if (
+      userLocation &&
+      item.location_display &&
+      item.location_display.coordinates &&
+      item.location_display.coordinates.length === 2
+    ) {
+      // Extract coordinates from location_display
+      const [lon, lat] = item.location_display.coordinates;
       const distance = getDistanceFromLatLonInKm(
         userLocation.latitude,
         userLocation.longitude,
-        item.coordinates.latitude,
-        item.coordinates.longitude
+        lat,
+        lon
       );
-      distanceText = `${distance.toFixed(1)} km`;
+      distanceText = `${distance.toFixed(1)} km away`;
     }
     return (
       <View style={styles.userItem}>
-        {item.profilePicture ? (
-          <Image source={{ uri: item.profilePicture }} style={styles.userImage} />
+        {item.profile_picture ? (
+          <Image source={{ uri: item.profile_picture }} style={styles.userImage} />
         ) : (
           <View style={[styles.userImage, styles.userPlaceholder]}>
             <Text style={styles.userPlaceholderText}>{item.name.charAt(0)}</Text>
@@ -185,10 +246,20 @@ const PokeScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* List of nearby users */}
+      {/* Transparent Mode Toggle */}
+      <View style={styles.transparentContainer}>
+        <Text style={styles.transparentLabel}>Transparent Mode</Text>
+        <Switch 
+          value={transparentMode} 
+          onValueChange={setTransparentMode} 
+          trackColor={{ false: '#ccc', true: '#4287f5' }}
+        />
+      </View>
+
+      {/* List of Nearby Users */}
       <FlatList
         data={nearbyUsers}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.user_id.toString()}
         renderItem={renderUserItem}
         contentContainerStyle={styles.listContent}
       />

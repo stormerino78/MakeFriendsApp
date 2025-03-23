@@ -19,7 +19,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from two_factor.urls import urlpatterns as tf_urls
 from rest_framework.routers import DefaultRouter
-from users.views import UserProfileViewSet, UserRegistrationView
+from users.views import UserProfileViewSet, UserRegistrationView, NearbyUsersView, ChatHistoryView, PokeView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from events.views import EventViewSet
 
@@ -36,6 +36,10 @@ urlpatterns = [
     path('dj-rest-auth/', include('dj_rest_auth.urls')),  # Provides endpoints /dj-rest-auth/login/ and /dj-rest-auth/logout/
     path('dj-rest-auth/registration/', include('dj_rest_auth.registration.urls')),  # Registration endpoint
     path('accounts/', include('allauth.urls')),  # Needed for the social account flows
+    path('api/nearby-users/', NearbyUsersView.as_view(), name='nearby_users'),
+    path('api/chats/me/', ChatHistoryView.as_view(), name='chat_history'),
+    path('api/poke/', PokeView.as_view(), name='poke'),
+
 ]
 
 if settings.DEBUG:

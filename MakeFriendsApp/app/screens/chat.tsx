@@ -1,14 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
   TouchableOpacity, 
   FlatList, 
   StyleSheet, 
-  SafeAreaView 
+  SafeAreaView, 
+  Alert 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import config from './(protected)/config.json';
+
+const BACKEND_URL = config.url;
 
 type ChatItem = {
   id: string;
@@ -18,26 +23,49 @@ type ChatItem = {
   blocked: boolean;
 };
 
-const dummyChats: ChatItem[] = [
-  { id: '1', name: 'Alice', lastMessage: 'Hey, how are you?', unread: true, blocked: false },
-  { id: '2', name: 'Bob', lastMessage: 'See you tomorrow!', unread: false, blocked: false },
-  { id: '3', name: 'Charlie', lastMessage: 'Blocked conversation', unread: false, blocked: true },
-  { id: '4', name: 'Diana', lastMessage: 'Let’s catch up soon!', unread: true, blocked: false },
-];
-
 const ChatScreen = () => {
   const router = useRouter();
+  const [chats, setChats] = useState<ChatItem[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread' | 'blocked'>('all');
 
-  const filteredChats = dummyChats.filter(chat => {
-    if (filter === 'all') return !chat.blocked; // Exclude blocked items
-    if (filter === 'unread') return chat.unread && !chat.blocked; // Exclude blocked items
+  // Fetch chat history from backend
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem('access_token');
+        if (!token) {
+          Alert.alert("Error", "Not logged in");
+          router.push('/screens/login');
+          return;
+        }
+        const response = await fetch(`${BACKEND_URL}/api/chats/me/`, {
+          method: 'GET',
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+        if (response.ok) {
+          const data: ChatItem[] = await response.json();
+          setChats(data);
+        } else {
+          Alert.alert("Error", "Failed to fetch chat history");
+        }
+      } catch (error: any) {
+        Alert.alert("Error", error.toString());
+      }
+    })();
+  }, []);
+
+  const filteredChats = chats.filter(chat => {
+    if (filter === 'all') return !chat.blocked; // Exclude blocked in all view
+    if (filter === 'unread') return chat.unread && !chat.blocked;
     if (filter === 'blocked') return chat.blocked;
     return true;
   });
 
   const renderChatItem = ({ item }: { item: ChatItem }) => (
-    <TouchableOpacity style={styles.chatItem}>
+    <TouchableOpacity style={styles.chatItem} onPress={() => Alert.alert("Open Chat", `Opening chat with ${item.name}`)}>
       <Text style={styles.chatName}>{item.name}</Text>
       <Text style={styles.chatMessage}>{item.lastMessage}</Text>
       {item.unread && filter === 'all' && (

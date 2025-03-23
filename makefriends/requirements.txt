@@ -1,6 +1,7 @@
 django
 djangorestframework
 psycopg2
+psycopg2-binary
 djangorestframework
 djangorestframework_simplejwt
 django-axes

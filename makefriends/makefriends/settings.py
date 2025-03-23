@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.gis',
     'rest_framework.authtoken',
     'django_otp',
     'django_otp.plugins.otp_static',
@@ -103,9 +104,16 @@ WSGI_APPLICATION = 'makefriends.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": "mydatabase",
+    'default': {
+        'ENGINE': 'django.contrib.gis.db.backends.postgis', 
+        'NAME': 'makefriends_db',
+        'USER': 'postgres',
+        'PASSWORD': 'MakeFriends2024',
+        'HOST': 'localhost',
+        'PORT': '5432',
+        'OPTIONS': {
+            'client_encoding': 'utf8',
+        },
     }
 }
 
@@ -210,3 +218,7 @@ SOCIALACCOUNT_PROVIDERS = {
 
 BASE_DIR = Path(__file__).resolve().parent
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+#GDAL path
+GDAL_LIBRARY_PATH = "D:\\project\\Makefriends\\MF\\venv\Lib\\site-packages\\osgeo\\gdal.dll"
+GEOS_LIBRARY_PATH= "D:\\project\\Makefriends\\MF\\venv\Lib\\site-packages\\osgeo\\geos_c.dll"
