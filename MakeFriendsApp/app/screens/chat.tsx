@@ -65,7 +65,10 @@ const ChatScreen = () => {
   });
 
   const renderChatItem = ({ item }: { item: ChatItem }) => (
-    <TouchableOpacity style={styles.chatItem} onPress={() => Alert.alert("Open Chat", `Opening chat with ${item.name}`)}>
+    <TouchableOpacity
+      style={styles.chatItem}
+      onPress={() => router.push(`/screens/chatConversation?chat_id=${item.id}`)}
+    >
       <Text style={styles.chatName}>{item.name}</Text>
       <Text style={styles.chatMessage}>{item.lastMessage}</Text>
       {item.unread && filter === 'all' && (

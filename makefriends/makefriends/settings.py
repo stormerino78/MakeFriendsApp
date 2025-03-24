@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     # 'allauth.socialaccount.providers.apple',  # Uncomment if using Apple
     'dj_rest_auth',
     'dj_rest_auth.registration',
+    'channels',
     'events',
     'users',
     'rest_framework',
@@ -222,3 +223,15 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 #GDAL path
 GDAL_LIBRARY_PATH = "D:\\project\\Makefriends\\MF\\venv\Lib\\site-packages\\osgeo\\gdal.dll"
 GEOS_LIBRARY_PATH= "D:\\project\\Makefriends\\MF\\venv\Lib\\site-packages\\osgeo\\geos_c.dll"
+
+# Django channels
+ASGI_APPLICATION = 'your_project.asgi.application'
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}

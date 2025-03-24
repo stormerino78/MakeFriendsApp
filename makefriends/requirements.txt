@@ -11,3 +11,6 @@ cryptography
 django-phonenumbers
 django-allauth
 dj-rest-auth
+channels
+channels_redis
+daphne
