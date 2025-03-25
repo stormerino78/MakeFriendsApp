@@ -5,9 +5,10 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.gis.measure import Distance
 from django.contrib.gis.db.models.functions import Distance as DistanceFunc
 from django.contrib.auth.models import User
+from rest_framework.generics import ListAPIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from .models import UserProfile, Chat
-from .serializers import UserProfileSerializer, ChatSerializer
+from .models import UserProfile, Chat, ChatMessage
+from .serializers import UserProfileSerializer, ChatSerializer, ChatMessageSerializer
 
 class UserRegistrationView(APIView):
     permission_classes = [AllowAny]  # Allow unauthenticated users to register
@@ -117,7 +118,7 @@ class PokeView(APIView):
         
         poking_user = request.user  # Bob
         
-        # Create a Chat between Bob and Alice if one doesn't already exist
+        # Create a Chat if one doesn't already exist
         chat = Chat.objects.filter(participants=poking_user).filter(participants=target_user).first()
         if not chat:
             chat = Chat.objects.create()
@@ -134,3 +135,10 @@ def lockout(request, credentials, *args, **kwargs):
         {"detail": "Your account has been locked due to too many failed login attempts. Please try again later."},
         status=status.HTTP_403_FORBIDDEN
     )
+
+class ChatMessageListView(ListAPIView):
+    serializer_class = ChatMessageSerializer
+
+    def get_queryset(self):
+        chat_id = self.kwargs.get('chat_id')
+        return ChatMessage.objects.filter(chat_id=chat_id).order_by('-created_at')
