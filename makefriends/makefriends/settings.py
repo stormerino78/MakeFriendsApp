@@ -235,3 +235,25 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {  # root logger
+        'handlers': ['console'],
+        'level': 'DEBUG',  # Or 'INFO' if you prefer
+    },
+    'loggers': {
+        # Optionally, you can configure a specific logger for your module.
+        'users.consumers': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}

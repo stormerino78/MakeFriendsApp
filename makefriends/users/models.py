@@ -41,10 +41,10 @@ class Chat(models.Model):
 class ChatMessage(models.Model):
     chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name='messages')
     sender = models.ForeignKey(User, on_delete=models.CASCADE)
-    content = models.TextField(blank=True, null=True)
+    message = models.TextField()
     # Optional image attachment:
-    image = models.ImageField(upload_to='chat_images/', null=True, blank=True)
-    timestamp = models.DateTimeField(auto_now_add=True)
+    #image = models.ImageField(upload_to='chat_images/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Message from {self.sender.username} at {self.timestamp}"
+        return f"{self.sender.username} in chat {self.chat.id}: {self.message}"

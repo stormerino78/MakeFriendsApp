@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.gis.geos import Point
-from .models import UserProfile, Chat
+from .models import UserProfile, Chat, ChatMessage
 
 class UserProfileSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source="user.id", read_only=True)  # Add this line
@@ -127,3 +127,11 @@ class ChatSerializer(serializers.ModelSerializer):
         if request:
             return obj.blocked_by.filter(id=request.user.id).exists()
         return False
+    
+class ChatMessageSerializer(serializers.ModelSerializer):
+    sender_username = serializers.CharField(source='sender.username', read_only=True)
+    
+    class Meta:
+        model = ChatMessage
+        fields = ['id', 'chat', 'sender', 'sender_username', 'message', 'created_at']
+        read_only_fields = ['id', 'created_at', 'sender']

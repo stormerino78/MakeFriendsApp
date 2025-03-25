@@ -67,7 +67,7 @@ const ChatScreen = () => {
   const renderChatItem = ({ item }: { item: ChatItem }) => (
     <TouchableOpacity
       style={styles.chatItem}
-      onPress={() => router.push(`/screens/chatConversation?chat_id=${item.id}`)}
+      onPress={() => router.push(`/screens/chatConversation?chat_id=${item.id}&chatName=${encodeURIComponent(item.name)}`)}
     >
       <Text style={styles.chatName}>{item.name}</Text>
       <Text style={styles.chatMessage}>{item.lastMessage}</Text>

@@ -1,1 +1,10 @@
 node_modules
+
+makefriends/users/migrations/
+makefriends/users/__pycache__/
+makefriends/events/__pycache__/
+makefriends/makefriends/__pycache__/
+makefriends/makefriends/media/
+makefriends/mydatabase
+MakeFriendsApp/package.json
+MakeFriendsApp/package-lock.json

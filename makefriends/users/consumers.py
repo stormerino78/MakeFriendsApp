@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         # Extract chat_id from the URL
+        logger.info(f"User in scope: {self.scope.get('user')}")
         self.chat_id = self.scope['url_route']['kwargs']['chat_id']
         self.chat_group_name = f'chat_{self.chat_id}'
 
@@ -45,19 +46,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
             logger.error("Invalid JSON received")
             return
         message = data.get('message')
+        messageId = data.get('messageId') # Extract messageId from the payload
         # Use the authenticated user from the connection as sender
-        sender = str(self.scope["user"])
+        sender = self.scope["user"]
         if not message:
             logger.warning("Empty message received; ignoring.")
             return
         
+        # Save the message to the database
+        await self.save_message(message, sender)
+
         # Broadcast message to the chat group
         await self.channel_layer.group_send(
             self.chat_group_name,
             {
                 'type': 'chat_message', # Calls chat message handler
                 'message': message,
-                'sender': sender,
+                'sender': str(sender.pk),
+                'sender_username': sender.username,
+                'messageId': messageId,
             }
         )
 
@@ -66,19 +73,33 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'message': event['message'],
             'sender': event['sender'],
+            'sender_username': event.get('sender_username', event['sender']),
+            'messageId': event.get('messageId'),
         }))
 
     @database_sync_to_async
     def user_is_allowed(self):
-        """
-        Check if the authenticated user is allowed to join this chat.
-        Verify that the user is in the chat's participants
-        """
+        print("dzadazda")
         try:
-            chat = Chat.objects.get(pk=int(self.chat_id))
+            chat = Chat.objects.get(pk=self.chat_id)
         except Chat.DoesNotExist:
             logger.error(f"Chat with id {self.chat_id} does not exist.")
             return False
 
-        # Check membership in the chat participants.
-        return self.scope["user"] in chat.participants.all()
+        try:
+            user_pk = int(self.scope["user"].pk)
+        except (ValueError, TypeError):
+            logger.error(f"User pk is not convertible to int: {self.scope['user'].pk}")
+            return False
+
+        participants_ids = list(chat.participants.values_list('id', flat=True))
+        logger.info(f"Chat participants: {participants_ids}, Current user pk: {user_pk}, type: {type(user_pk)}")
+        
+        return chat.participants.filter(pk=user_pk).exists()
+
+    @database_sync_to_async
+    def save_message(self, message, sender):
+        # Import ChatMessage locally to avoid circular imports.
+        from users.models import ChatMessage, Chat
+        chat = Chat.objects.get(pk=self.chat_id)
+        return ChatMessage.objects.create(chat=chat, sender=sender, message=message)
