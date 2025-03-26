@@ -27,35 +27,56 @@ const ChatScreen = () => {
   const router = useRouter();
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread' | 'blocked'>('all');
+  const [currentUserId, setCurrentUserId] = useState<string>('');
 
+  const getLastMessageForChat = async (chat: ChatItem, token: string, currentUserId: string) => {
+    try {
+      const messagesResponse = await fetch(`${BACKEND_URL}/api/chats/${chat.id}/messages/`, {
+        method: 'GET',
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+      if (messagesResponse.ok) {
+        const messagesData = await messagesResponse.json();
+        const latestOtherMessage = messagesData.find((msg: any) => msg.sender.toString() !== currentUserId);
+        const lastMsg = latestOtherMessage ? latestOtherMessage.message : "No messages";
+        return { ...chat, lastMessage: lastMsg };
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    return { ...chat, lastMessage: "No messages" };
+  };
+  
   // Fetch chat history from backend
   useEffect(() => {
     (async () => {
-      try {
-        const token = await AsyncStorage.getItem('access_token');
-        if (!token) {
-          Alert.alert("Error", "Not logged in");
-          router.push('/screens/login');
-          return;
-        }
-        const response = await fetch(`${BACKEND_URL}/api/chats/me/`, {
-          method: 'GET',
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-        });
-        if (response.ok) {
-          const data: ChatItem[] = await response.json();
-          setChats(data);
-        } else {
-          Alert.alert("Error", "Failed to fetch chat history");
-        }
-      } catch (error: any) {
-        Alert.alert("Error", error.toString());
+      const token = await AsyncStorage.getItem('access_token');
+      if (!token) {
+        Alert.alert("Error", "Not logged in");
+        router.push('/screens/login');
+        return;
+      }
+      const response = await fetch(`${BACKEND_URL}/api/chats/me/`, {
+        method: 'GET',
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data: ChatItem[] = await response.json();
+        const chatsWithLastMessages = await Promise.all(
+          data.map(chat => getLastMessageForChat(chat, token, currentUserId))
+        );
+        setChats(chatsWithLastMessages);
+      } else {
+        Alert.alert("Error", "Failed to fetch chat history");
       }
     })();
-  }, []);
+  }, [currentUserId]);
 
   const filteredChats = chats.filter(chat => {
     if (filter === 'all') return !chat.blocked; // Exclude blocked in all view
