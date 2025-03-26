@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import config from './(protected)/config.json';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const BACKEND_URL = config.url;
 
@@ -38,7 +39,8 @@ const AccountScreen = () => {
   // State for the profile picture URI; will hold the image file path
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [mood, setMood] = useState('');
-
+  const [activeInput, setActiveInput] = useState<string | null>(null);
+  
   // Fetch the current user profile from the backend when the component mounts
   useEffect(() => {
     const fetchProfile = async () => {
@@ -175,273 +177,259 @@ const AccountScreen = () => {
   };
 
   return (
-    <KeyboardAwareScrollView
-    style={styles.container}
-    contentContainerStyle={styles.contentContainer}
-    keyboardShouldPersistTaps="handled"
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push('/screens/(protected)/profile')}>
-          <Ionicons name="arrow-back" size={24}/>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Account</Text>
-      </View>
-        {profilePicture && (
-        // Display the profile image in a circular view.
-        <Image
-          source={{ uri: profilePicture }}
-          style={styles.profileImage}
-        />
-      )}
-      <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
-        <Text style={styles.imagePickerText}>Change Profile Picture</Text>
-      </TouchableOpacity>
-
-      {/* Read-only fields */}
-      <Text style={styles.label}>Username</Text>
-      <TextInput
-        placeholder="username"
-        style={styles.input}
-        value={username}
-        onChangeText={setUsername}
-      />
-      <Text style={styles.label}>Email</Text>
-      <TextInput
-        placeholder="email"
-        style={styles.input}
-        value={email}
-        onChangeText={setEmail}
-      />
-      <Text style={styles.label}>Name</Text>
-      <TextInput
-        placeholder="Name"
-        style={styles.input}
-        value={name}
-        onChangeText={setName}
-      />
-      <Text style={styles.label}>Date of birth</Text>
-      <TouchableOpacity
-        style={styles.datePickerButton}
-        onPress={() => setShowDatePicker(true)}
+    <LinearGradient colors={['#f9f9f9', '#fff']} style={styles.gradient}>
+      <KeyboardAwareScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
       >
-        <Ionicons name="calendar-outline" size={24} color="#333" style={styles.optionIcon} />
-        <Text style={styles.datePickerText}>
-          {dateOfBirth.toISOString().split('T')[0]}
-        </Text>
-      </TouchableOpacity>
-      {showDatePicker && (
-        <DateTimePicker
-          value={dateOfBirth}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-          maximumDate={new Date()}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.push('/screens/(protected)/profile')}>
+            <Ionicons name="arrow-back" size={24} color={secondaryOrange} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Account</Text>
+        </View>
+        {profilePicture && (
+          <Image
+            source={{ uri: profilePicture }}
+            style={styles.profileImage}
+          />
+        )}
+        <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
+          <Text style={styles.imagePickerText}>Change Profile Picture</Text>
+        </TouchableOpacity>
+        <Text style={styles.label}>Username</Text>
+        <TextInput
+          placeholder="Username"
+          style={[styles.input, activeInput === 'username' && styles.inputFocused]}
+          value={username}
+          onChangeText={setUsername}
+          placeholderTextColor="rgba(0,0,0,0.6)"
+          cursorColor={secondaryOrange}
+          onFocus={() => setActiveInput('username')}
         />
-      )}
-
-      {/* Picker for Gender */}
-      <Text style={styles.label}>Gender</Text>
-      <View style={styles.pickerContainer}>
-        <Picker
-          selectedValue={gender}
-          style={styles.picker}
-          onValueChange={(itemValue) => setGender(itemValue)}
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          placeholder="email"
+          style={[styles.input, activeInput === 'email' && styles.inputFocused]}
+          value={email}
+          onChangeText={setEmail}
+          placeholderTextColor="rgba(0,0,0,0.6)"
+          cursorColor={secondaryOrange}
+          onFocus={() => setActiveInput('email')}
+        />
+        <Text style={styles.label}>Name</Text>
+        <TextInput
+          placeholder="Name"
+          style={[styles.input, activeInput === 'name' && styles.inputFocused]}
+          value={name}
+          onChangeText={setName}
+          placeholderTextColor="rgba(0,0,0,0.6)"
+          cursorColor={secondaryOrange}
+          onFocus={() => setActiveInput('name')}
+        />
+        <Text style={styles.label}>Date of birth</Text>
+        <TouchableOpacity
+          style={styles.datePickerButton}
+          onPress={() => setShowDatePicker(true)}
         >
-          <Picker.Item label="Select gender" value="" />
-          <Picker.Item label="Homme" value="homme" />
-          <Picker.Item label="Femme" value="femme" />
-        </Picker>
-      </View>
-
-      {/* Input for Interests */}
-      <Text style={styles.label}>Interests</Text>
-      <TextInput
-        placeholder="Interests"
-        style={styles.input}
-        value={interests}
-        onChangeText={setInterests}
-      />
-
-      {/* Picker for Personality */}
-      <Text style={styles.label}>Personality:</Text>
-      <View style={styles.pickerContainer}>
-        <Picker
-          selectedValue={personality}
-          style={styles.picker}
-          onValueChange={(itemValue) => setPersonality(itemValue)}
-        >
-          <Picker.Item label="What are you more?" value="" />
-          <Picker.Item label="Introvert" value="Introvert" />
-          <Picker.Item label="Extravert" value="Extravert" />
-        </Picker>
-      </View>
-      
-      {/* New Picker for Mood */}
-      <Text style={styles.label}>Friendship Mood</Text>
-      <View style={styles.pickerContainer}>
-        <Picker selectedValue={mood} style={styles.picker} onValueChange={(itemValue) => setMood(itemValue)}>
-          <Picker.Item label="None" value="" />
-          <Picker.Item label="Casual chat" value="casual chat" />
-          <Picker.Item label="Looking for a deep talk" value="deep talk" />
-          <Picker.Item label="Activity partner" value="activity partner" />
-          <Picker.Item label="Networking" value="networking" />
-          <Picker.Item label="New to town" value="new to town" />
-        </Picker>
-      </View>
-      {/* Input for Why */}
-      <Text style={styles.label}>Why are you on the app?</Text>
-      <TextInput
-        placeholder="Why?"
-        style={styles.input}
-        value={why}
-        onChangeText={setWhy}
-      />
-
-      {/* Save Button */}
-      <TouchableOpacity style={styles.button} onPress={handleSave}>
-        <Text style={styles.buttonText}>Save Profile</Text>
-      </TouchableOpacity>
-    </KeyboardAwareScrollView>
+          <Ionicons name="calendar-outline" size={24} color="#333" style={styles.optionIcon} />
+          <Text style={styles.datePickerText}>
+            {dateOfBirth.toISOString().split('T')[0]}
+          </Text>
+        </TouchableOpacity>
+        {showDatePicker && (
+          <DateTimePicker
+            value={dateOfBirth}
+            mode="date"
+            display="default"
+            onChange={handleDateChange}
+            maximumDate={new Date()}
+          />
+        )}
+        <Text style={styles.label}>Gender</Text>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={gender}
+            style={styles.picker}
+            onValueChange={(itemValue) => setGender(itemValue)}
+          >
+            <Picker.Item label="Select gender" value="" />
+            <Picker.Item label="Homme" value="homme" />
+            <Picker.Item label="Femme" value="femme" />
+          </Picker>
+        </View>
+        <Text style={styles.label}>Interests</Text>
+        <TextInput
+          placeholder="Interests"
+          style={[styles.input, activeInput === "Interests" && styles.inputFocused]}
+          value={interests}
+          onChangeText={setInterests}
+          placeholderTextColor="rgba(0,0,0,0.6)"
+          cursorColor={secondaryOrange}
+          onFocus={() => setActiveInput("Interests")}
+        />
+        <Text style={styles.label}>Personality:</Text>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={personality}
+            style={styles.picker}
+            onValueChange={(itemValue) => setPersonality(itemValue)}
+          >
+            <Picker.Item label="What are you more?" value="" />
+            <Picker.Item label="Introvert" value="Introvert" />
+            <Picker.Item label="Extravert" value="Extravert" />
+          </Picker>
+        </View>
+        <Text style={styles.label}>Friendship Mood</Text>
+        <View style={styles.pickerContainer}>
+          <Picker selectedValue={mood} style={styles.picker} onValueChange={(itemValue) => setMood(itemValue)}>
+            <Picker.Item label="None" value="" />
+            <Picker.Item label="Casual chat" value="casual chat" />
+            <Picker.Item label="Looking for a deep talk" value="deep talk" />
+            <Picker.Item label="Activity partner" value="activity partner" />
+            <Picker.Item label="Networking" value="networking" />
+            <Picker.Item label="New to town" value="new to town" />
+          </Picker>
+        </View>
+        <Text style={styles.label}>Why are you on the app?</Text>
+        <TextInput
+          placeholder=" "
+          style={[styles.input, activeInput === " " && styles.inputFocused]}
+          value={why}
+          onChangeText={setWhy}
+          placeholderTextColor="rgba(0,0,0,0.6)"
+          cursorColor={secondaryOrange}
+          onFocus={() => setActiveInput(" ")}
+        />
+        <TouchableOpacity style={styles.button} onPress={handleSave}>
+          <Text style={styles.buttonText}>Save Profile</Text>
+        </TouchableOpacity>
+      </KeyboardAwareScrollView>
+    </LinearGradient>
   );
 };
 
-export default AccountScreen;
+const secondaryOrange = "#FFA500";
 
 const styles = StyleSheet.create({
-  container: {
+  gradient: {
     flex: 1,
-    backgroundColor: '#fff',
+  },
+  container: {
+    backgroundColor: "rgba(255,255,255,0.95)",
+    flex: 1,
   },
   contentContainer: {
     padding: 16,
-    justifyContent: 'center',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 0.5,
+    borderColor: "#ccc",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     marginLeft: 12,
-    alignItems: 'center',
+    color: "#333",
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
-  profileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 16,
-  },
-  // Style for displaying the profile image (circular image)
   profileImage: {
     width: 100,
     height: 100,
     borderRadius: 50,
     alignSelf: 'center',
     marginBottom: 15,
+    borderWidth: 1,
+    borderColor: secondaryOrange,
   },
-  profilePlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
+  imagePickerButton: {
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderColor: secondaryOrange,
+    borderWidth: 1,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 15,
   },
-  profileInfo: {
-    flexDirection: 'column',
-  },
-  profileName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  profileEmail: {
+  imagePickerText: {
+    color: "rgba(0,0,0,0.9)",
+    textAlign: 'center',
     fontSize: 14,
   },
-  editContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  label: {
+    fontSize: 14,
+    padding: 10,
+    color: '#000',
   },
   input: {
-    height: 50,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderBottomWidth: 1,
     borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 5,
-    marginBottom: 15,
-    paddingHorizontal: 10,
-    backgroundColor: '#fff',
-  },
-  // Style for the button that triggers image picking
-  imagePickerButton: {
-    backgroundColor: '#888',
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 15,
-  },
-  // Text style for the image picker button
-  imagePickerText: {
-    color: '#fff',
-    textAlign: 'center',
+    marginBottom: 16,
+    marginLeft: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 0
   },
   datePickerButton: {
     height: 50,
     flexDirection: 'row',
     alignItems: 'center',
-    borderColor: '#333',
+    borderColor: "rgba(0,0,0,0.2)",
     borderWidth: 1,
-    borderRadius: 5,
+    borderRadius: 8,
     marginBottom: 15,
+    marginLeft: 12,
     paddingHorizontal: 10,
-    backgroundColor: '#fff',
+    backgroundColor: "rgba(255,255,255,0.9)",
   },
   datePickerText: {
     fontSize: 14,
+    color: '#333',
   },
   optionIcon: {
     marginRight: 6,
   },
   pickerContainer: {
-    borderColor: '#ccc',
+    borderColor: "rgba(0,0,0,0.2)",
     borderWidth: 1,
-    borderRadius: 5,
+    borderRadius: 8,
     marginBottom: 15,
-    backgroundColor: '#fff',
+    marginLeft: 12,
+    backgroundColor: "rgba(255,255,255,0.9)",
   },
   picker: {
     height: 50,
     width: '100%',
   },
-  label: {
-    fontSize: 14,
-    padding: 10,
-  },
-  saveButton: {
-    backgroundColor: '#4287f5',
-    padding: 16,
-    borderRadius: 5,
-    margin: 16,
-  },
-  saveButtonText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontSize: 18,
-  },
-  // Style for the save profile button
   button: {
-    backgroundColor: '#4287f5',
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderColor: secondaryOrange,
+    borderWidth: 1,
     padding: 15,
-    borderRadius: 5,
+    borderRadius: 12,
     marginBottom: 10,
   },
-  // Text style for the save profile button
   buttonText: {
-    color: '#fff',
+    color: "rgba(0,0,0,0.9)",
     textAlign: 'center',
     fontSize: 18,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
+  inputFocused: { borderBottomColor: secondaryOrange, borderBottomWidth: 2, },
 });
+
+export default AccountScreen;

@@ -8,6 +8,7 @@ import {
   Dimensions,
   Platform,
   Alert,
+  ScrollView,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { useRouter } from 'expo-router';
@@ -18,6 +19,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import config from './config.json';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 
 const BACKEND_URL = config.url;
 
@@ -42,6 +45,17 @@ export type MarkerType = {
   eventType: string;  // Optional: type of event
   age_range?: string; // Optional: date of the event
   gender_preference?: string; // Optional: gender preference for the event
+};
+
+// Helper function to format ISO date strings into French style ("28 mars | 21:14")
+const formatEventDate = (dateString: string) => {
+  const date = new Date(dateString);
+  const day = date.getDate();
+  const months = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+  const month = months[date.getMonth()];
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${day} ${month} | ${hours}:${minutes}`;
 };
 
 const HomeScreen = () => {
@@ -194,21 +208,13 @@ const HomeScreen = () => {
 
   // Sort handler
   const handleSort = (option: string) => {
-    if (option === 'none') {
-      setSortOption(null);
-    } else {
-      setSortOption(option);
-    }
+    setSortOption(option === 'none' ? null : option);
     setShowFilter(false);
   };
 
   // Filter handler
   const handleFilter = (option: string) => {
-    if (option === 'none') {
-      setFilterOption(null);
-    } else {
-      setFilterOption(option);
-    }
+    setFilterOption(option === 'none' ? null : option);
     setShowFilter(false);
   };
 
@@ -311,512 +317,429 @@ const HomeScreen = () => {
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
   return (
-    <View style={styles.container}>
-      {/* --- Top Friendship Mood Selector --- 
-      <View style={styles.moodContainer}>
-        {['Chat', 'Activity Partner', 'Business', 'Open'].map(mood => (
-          <TouchableOpacity
-            key={mood}
-            style={[
-              styles.moodButton,
-              selectedMood === mood && styles.moodButtonActive,
-            ]}
-            onPress={() => setSelectedMood(mood)}
-          >
-            <Text
-              style={[
-                styles.moodButtonText,
-                selectedMood === mood && styles.moodButtonTextActive,
-              ]}
+    <LinearGradient colors={['rgba(255,255,255,0.9)', 'rgba(255,165,0,0.05)']} style={styles.gradient}>
+      <View style={styles.container}>
+        <TextInput
+          style={styles.searchBar}
+          placeholder="Search events or people..."
+          placeholderTextColor="rgba(0,0,0,0.6)"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+
+        <View style={styles.viewFilterBar}>
+          <View style={styles.viewToggleContainer}>
+            <TouchableOpacity
+              style={styles.viewButton}
+              onPress={() => setViewMode('list')}
             >
-              {mood}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      */}
-
-      {/* --- Search Bar --- */}
-      <TextInput
-        style={styles.searchBar}
-        placeholder="Search events or people..."
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-      />
-
-      {/* --- Bar with View Toggle and Filter Button --- */}
-      <View style={styles.viewFilterBar}>
-        <View style={styles.viewToggleContainer}>
-          <TouchableOpacity
-            style={styles.viewButton}
-            onPress={() => setViewMode('list')}
-          >
-            <Ionicons
-              name="list-outline"
-              size={20}
-              color={viewMode === 'list' ? '#4287f5' : '#333'}
-              style={styles.viewIcon}
-            />
-            <Text
-              style={[
-                styles.viewButtonText,
-                viewMode === 'list' && styles.activeViewButtonText,
-              ]}
-            >
-              List
-            </Text>
-          </TouchableOpacity>
-
-          {/* Vertical divider */}
-          <View style={styles.divider} />
-
-          <TouchableOpacity
-            style={styles.viewButton}
-            onPress={() => setViewMode('map')}
-          >
-            <Ionicons
-              name="map-outline"
-              size={20}
-              color={viewMode === 'map' ? '#4287f5' : '#333'}
-              style={styles.viewIcon}
-            />
-            <Text
-              style={[
-                styles.viewButtonText,
-                viewMode === 'map' && styles.activeViewButtonText,
-              ]}
-            >
-              Carte
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Filter Section with Label and Icon */}
-        <View style={styles.filterContainer}>
-          <Text style={styles.filterLabel}>Filtrer</Text>
-          <TouchableOpacity
-            style={styles.filterButton}
-            onPress={() => setShowFilter(!showFilter)}
-          >
-            <Ionicons name="filter-circle-outline" size={34} color="#4287f5" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* --- Bottom-Sheet-Style Modal (react-native-modal) --- */}
-      <Modal
-        isVisible={showFilter}
-        onBackdropPress={() => setShowFilter(false)}
-        style={styles.bottomModal}
-        animationIn="slideInUp"
-        animationOut="slideOutDown"
-      >
-        {/* The container that appears from the bottom, full width */}
-        <View style={styles.fullWidthModal}>
-          <Text style={styles.modalTitle}>Trier par</Text>
-
-          {/* None / reset option */}
-          <TouchableOpacity
-            onPress={() => {
-              handleSort('none');
-              handleFilter('none');
-            }}
-            style={styles.modalOptionRow}
-          >
-            <View style={styles.checkIconContainer}>
-              {sortOption === null && filterOption === null && (
-                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
-              )}
-            </View>
-            <Ionicons name="close-circle-outline" size={24} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>None</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => handleSort('alphabetical')} style={styles.modalOptionRow}>
-            <View style={styles.checkIconContainer}>
-              {sortOption === 'alphabetical' && (
-                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
-              )}
-            </View>
-            <Ionicons name="list-outline" size={24} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>Alphabetically</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleSort('oldest')} style={styles.modalOptionRow}>
-            <View style={styles.checkIconContainer}>
-              {sortOption === 'oldest' && (
-                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
-              )}
-            </View>
-            <Ionicons name="arrow-up-outline" size={24} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>Oldest to Newest</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleSort('newest')} style={styles.modalOptionRow}>
-            <View style={styles.checkIconContainer}>
-              {sortOption === 'newest' && (
-                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
-              )}
-            </View>
-            <Ionicons name="arrow-down-outline" size={24} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>Newest to Oldest</Text>
-          </TouchableOpacity>
-
-          {/* Filter Section */}
-          <Text style={[styles.modalTitle, { marginTop: 15 }]}>Filtrer par</Text>
-          <TouchableOpacity onPress={() => handleFilter('sport')} style={styles.modalOptionRow}>
-            <View style={styles.checkIconContainer}>
-              {filterOption === 'sport' && (
-                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
-              )}
-            </View>
-            <Ionicons name="football-outline" size={24} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>Sport</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleFilter('cultural')} style={styles.modalOptionRow}>
-            <View style={styles.checkIconContainer}>
-              {filterOption === 'cultural' && (
-                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
-              )}
-            </View>
-            <Ionicons name="ticket-outline" size={24} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>Cultural</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleFilter('networking')} style={styles.modalOptionRow}>
-            <View style={styles.checkIconContainer}>
-              {filterOption === 'networking' && (
-                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
-              )}
-            </View>
-            <Ionicons name="briefcase-outline" size={24} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>Networking</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleFilter('online')} style={styles.modalOptionRow}>
-            <View style={styles.checkIconContainer}>
-              {filterOption === 'online' && (
-                <Ionicons name="arrow-forward-outline" size={24} color="#4287f5" />
-              )}
-            </View>
-            <Ionicons name="wifi-outline" size={24} color="#333" style={styles.optionIcon} />
-            <Text style={styles.optionText}>Online</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
-
-      {/* --- Conditionally Render Map or List View --- */}
-      {viewMode === 'map' ? (
-        <>
-          <MapView
-            ref={mapRef}
-            style={styles.map}
-            initialRegion={
-              userLocation
-                ? { ...userLocation, latitudeDelta: 0.0922, longitudeDelta: 0.0421 }
-                : INITIAL_REGION
-            }
-            onRegionChangeComplete={handleRegionChangeComplete}
-            showsUserLocation={true}
-          >
-            {filteredMarkers.map(marker => (
-              <Marker
-                key={marker.id}
-                coordinate={marker.coordinates}
-                onPress={() => setSelectedMarker(marker)}
-                image={
-                  marker.eventType === 'cultural'
-                    ? require('../../../assets/images/cultural_icon.png')
-                    : marker.eventType === 'sport'
-                    ? require('../../../assets/images/sport_icon.png')
-                    : marker.eventType === 'online'
-                    ? require('../../../assets/images/online_icon.png')
-                    : marker.eventType === 'networking'
-                    ? require('../../../assets/images/networking_icon.png')
-                    : require('../../../assets/images/event_icon.png')
-                }
+              <Ionicons
+                name="list-outline"
+                size={20}
+                color={viewMode === 'list' ? secondaryOrange : '#333'}
+                style={styles.viewIcon}
               />
-            ))}
-          </MapView>
-        </>
-      ) : (
-        // Render List view
-        <View style={styles.listContainer}>
-          {filteredMarkers.map(marker => (
-            <TouchableOpacity
-              key={marker.id}
-              style={styles.listItem}
-              onPress={() => handleJoinEvent(marker)}
-            >
-              <Text style={styles.listTitle}>{marker.title}</Text>
-              <Text style={styles.listDescription}>{marker.description}</Text>
-              <Text style={styles.cardDescription}>Type: {marker.eventType}</Text>
-              <Text style={styles.cardDescription}>Date: {marker.date}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-      {/* --- Bottom Card for Selected Marker only in the map view --- */}
-      {viewMode === 'map' && selectedMarker && (
-        <View style={styles.bottomCard}>
-          <Text style={styles.cardTitle}>{selectedMarker.title}</Text>
-          <Text style={styles.cardDescription}>{selectedMarker.description}</Text>
-          <Text style={styles.cardDescription}>Type: {selectedMarker.eventType}</Text>
-          <Text style={styles.cardDescription}>Date: {selectedMarker.date}</Text>
-          {selectedMarker.age_range && (
-            <Text style={styles.cardDescription}>
-              Age Range: {selectedMarker.age_range}
-            </Text>
-          )}
-          {selectedMarker.gender_preference && (
-            <Text style={styles.cardDescription}>
-              Gender Pref: {selectedMarker.gender_preference}
-            </Text>
-          )}
-          <TouchableOpacity onPress={() => setSelectedMarker(null)}>
-            <Text style={styles.closeButton}>Close</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-      {/* Floating Action Button (FAB) */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setShowFABMenu(!showFABMenu)}
-      >
-        <Ionicons name="add" size={28} color="#fff" />
-      </TouchableOpacity>
-
-      {/* FAB Menu (appears above the FAB when toggled) */}
-      {showFABMenu && (
-        <View style={styles.fabMenu}>
-          <TouchableOpacity
-            style={styles.fabMenuItem}
-            onPress={() => {
-              setShowCreateEventModal(true);
-              setShowFABMenu(false);
-            }}
-          >
-            <Text style={styles.fabMenuText}>Create Event</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Modal for Creating New Event */}
-      <Modal
-        isVisible={showCreateEventModal}
-        onBackdropPress={() => setShowCreateEventModal(false)}
-      >
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Create New Event</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Title"
-            value={newTitle}
-            onChangeText={setNewTitle}
-          />
-          <TextInput
-            style={[styles.input, { height: 80 }]}
-            placeholder="Description"
-            value={newDescription}
-            onChangeText={setNewDescription}
-            multiline
-          />
-          <TouchableOpacity
-            style={styles.datePickerButton}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Ionicons name="calendar-outline" size={24} color="#333" style={styles.optionIcon} />
-            <Text style={styles.datePickerText}>
-              {`${newDate.toISOString().split('T')[0]}`}
-            </Text>
-          </TouchableOpacity>
-          {showDatePicker && (
-            <DateTimePicker
-              value={newDate}
-              mode="date"
-              display="default"
-              onChange={handleNewDateChange}
-              minimumDate={new Date()}
-            />
-          )}
-          {/* Drop-down for Event Type */}
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={newEventType}
-              onValueChange={(itemValue) => setNewEventType(itemValue)}
-              style={styles.picker}
-            >
-              <Picker.Item label="SELECT" value={null} />
-              <Picker.Item label="SPORT" value="sport" />
-              <Picker.Item label="ONLINE" value="online" />
-              <Picker.Item label="CULTURAL" value="cultural" />
-              <Picker.Item label="NETWORKING" value="networking" />
-            </Picker>
-          </View>
-          {/* Button to launch location picker, no location for online events */}
-          {newEventType !== 'online' && (
-            <TouchableOpacity
-              style={styles.selectLocationButton}
-              onPress={() => setShowLocationPickerModal(true)}
-            >
-              <Text style={styles.selectLocationText}>
-                {newEventCoordinates
-                  ? `Location: (${newEventCoordinates.latitude.toFixed(4)}, ${newEventCoordinates.longitude.toFixed(4)})`
-                  : "Select Location"}
+              <Text style={[styles.viewButtonText, viewMode === 'list' && styles.activeViewButtonText]}>
+                List
               </Text>
             </TouchableOpacity>
-          )}
-          {/* Optional fields */}
-          <TextInput
-            style={styles.input}
-            placeholder="Age Range (optional)"
-            value={newAgeRange}
-            onChangeText={setNewAgeRange}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Gender Preference (optional)"
-            value={newGenderPreference}
-            onChangeText={setNewGenderPreference}
-          />
-          <TouchableOpacity style={styles.publishButton} onPress={handlePublishEvent}>
-            <Text style={styles.publishButtonText}>Publish</Text>
-          </TouchableOpacity>
+            <View style={styles.divider} />
+            <TouchableOpacity
+              style={styles.viewButton}
+              onPress={() => setViewMode('map')}
+            >
+              <Ionicons
+                name="map-outline"
+                size={20}
+                color={viewMode === 'map' ? secondaryOrange : '#333'}
+                style={styles.viewIcon}
+              />
+              <Text style={[styles.viewButtonText, viewMode === 'map' && styles.activeViewButtonText]}>
+                Carte
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.filterContainer}>
+            <Text style={styles.filterLabel}>Filtrer</Text>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={() => setShowFilter(!showFilter)}
+            >
+              <Ionicons name="filter-circle-outline" size={34} color={secondaryOrange} />
+            </TouchableOpacity>
+          </View>
         </View>
-      </Modal>
-      {/* Modal for Location Picker */}
-      <Modal
-        isVisible={showLocationPickerModal}
-        onBackdropPress={() => setShowLocationPickerModal(false)}
-        style={styles.locationModal}
-      >
-        <View style={styles.locationModalContent}>
-          <Text style={styles.modalTitle}>Select Event Location</Text>
-          <MapView
-            style={styles.locationMap}
-            initialRegion={
-              userLocation
-                ? { ...userLocation, latitudeDelta: 0.0922, longitudeDelta: 0.0421 }
-                : INITIAL_REGION
-            }
-            onPress={handleMapPressForLocation}
-          >
-            {newEventCoordinates && (
-              <Marker coordinate={newEventCoordinates} />
-            )}
-          </MapView>
-          <TouchableOpacity
-            style={styles.confirmLocationButton}
-            onPress={() => setShowLocationPickerModal(false)}
-          >
-            <Text style={styles.confirmLocationText}>Confirm Location</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
-    </View>
+
+        <Modal
+          isVisible={showFilter}
+          onBackdropPress={() => setShowFilter(false)}
+          style={styles.bottomModal}
+          animationIn="slideInUp"
+          animationOut="slideOutDown"
+        >
+          <View style={styles.fullWidthModal}>
+            <Text style={styles.modalTitle}>Trier par</Text>
+            <TouchableOpacity
+              onPress={() => {
+                handleSort('none');
+                handleFilter('none');
+              }}
+              style={styles.modalOptionRow}
+            >
+              <View style={styles.checkIconContainer}>
+                {sortOption === null && filterOption === null && (
+                  <Ionicons name="arrow-forward-outline" size={24} color={secondaryOrange} />
+                )}
+              </View>
+              <Ionicons name="close-circle-outline" size={24} color="#333" style={styles.optionIcon} />
+              <Text style={styles.optionText}>None</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleSort('alphabetical')} style={styles.modalOptionRow}>
+              <View style={styles.checkIconContainer}>
+                {sortOption === 'alphabetical' && (
+                  <Ionicons name="arrow-forward-outline" size={24} color={secondaryOrange} />
+                )}
+              </View>
+              <Ionicons name="list-outline" size={24} color="#333" style={styles.optionIcon} />
+              <Text style={styles.optionText}>Alphabetically</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleSort('oldest')} style={styles.modalOptionRow}>
+              <View style={styles.checkIconContainer}>
+                {sortOption === 'oldest' && (
+                  <Ionicons name="arrow-forward-outline" size={24} color={secondaryOrange} />
+                )}
+              </View>
+              <Ionicons name="arrow-up-outline" size={24} color="#333" style={styles.optionIcon} />
+              <Text style={styles.optionText}>Oldest to Newest</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleSort('newest')} style={styles.modalOptionRow}>
+              <View style={styles.checkIconContainer}>
+                {sortOption === 'newest' && (
+                  <Ionicons name="arrow-forward-outline" size={24} color={secondaryOrange} />
+                )}
+              </View>
+              <Ionicons name="arrow-down-outline" size={24} color="#333" style={styles.optionIcon} />
+              <Text style={styles.optionText}>Newest to Oldest</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { marginTop: 15 }]}>Filtrer par</Text>
+            <TouchableOpacity onPress={() => handleFilter('sport')} style={styles.modalOptionRow}>
+              <View style={styles.checkIconContainer}>
+                {filterOption === 'sport' && (
+                  <Ionicons name="arrow-forward-outline" size={24} color={secondaryOrange} />
+                )}
+              </View>
+              <Ionicons name="football-outline" size={24} color="#333" style={styles.optionIcon} />
+              <Text style={styles.optionText}>Sport</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleFilter('cultural')} style={styles.modalOptionRow}>
+              <View style={styles.checkIconContainer}>
+                {filterOption === 'cultural' && (
+                  <Ionicons name="arrow-forward-outline" size={24} color={secondaryOrange} />
+                )}
+              </View>
+              <Ionicons name="ticket-outline" size={24} color="#333" style={styles.optionIcon} />
+              <Text style={styles.optionText}>Cultural</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleFilter('networking')} style={styles.modalOptionRow}>
+              <View style={styles.checkIconContainer}>
+                {filterOption === 'networking' && (
+                  <Ionicons name="arrow-forward-outline" size={24} color={secondaryOrange} />
+                )}
+              </View>
+              <Ionicons name="briefcase-outline" size={24} color="#333" style={styles.optionIcon} />
+              <Text style={styles.optionText}>Networking</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleFilter('online')} style={styles.modalOptionRow}>
+              <View style={styles.checkIconContainer}>
+                {filterOption === 'online' && (
+                  <Ionicons name="arrow-forward-outline" size={24} color={secondaryOrange} />
+                )}
+              </View>
+              <Ionicons name="wifi-outline" size={24} color="#333" style={styles.optionIcon} />
+              <Text style={styles.optionText}>Online</Text>
+            </TouchableOpacity>
+          </View>
+        </Modal>
+
+        {viewMode === 'map' ? (
+          <>
+            <MapView
+              ref={mapRef}
+              style={styles.map}
+              initialRegion={
+                userLocation
+                  ? { ...userLocation, latitudeDelta: 0.0922, longitudeDelta: 0.0421 }
+                  : INITIAL_REGION
+              }
+              onRegionChangeComplete={handleRegionChangeComplete}
+              showsUserLocation={true}
+            >
+              {filteredMarkers.map(marker => (
+                <Marker
+                  key={marker.id}
+                  coordinate={marker.coordinates}
+                  onPress={() => setSelectedMarker(marker)}
+                  image={
+                    marker.eventType === 'cultural'
+                      ? require('../../../assets/images/cultural_icon.png')
+                      : marker.eventType === 'sport'
+                      ? require('../../../assets/images/sport_icon.png')
+                      : marker.eventType === 'online'
+                      ? require('../../../assets/images/online_icon.png')
+                      : marker.eventType === 'networking'
+                      ? require('../../../assets/images/networking_icon.png')
+                      : require('../../../assets/images/event_icon.png')
+                  }
+                />
+              ))}
+            </MapView>
+          </>
+        ) : (
+          <ScrollView style={styles.listContainer}>
+            {filteredMarkers.map(marker => (
+              <TouchableOpacity
+                key={marker.id}
+                style={styles.listItem}
+                onPress={() => handleJoinEvent(marker)}
+              >
+                <Text style={styles.listTitle}>{marker.title}</Text>
+                <Text style={styles.listDescription}>{marker.description}</Text>
+                <Text style={styles.cardDescription}>Type: {marker.eventType}</Text>
+                <Text style={styles.cardDescription}>Date: {formatEventDate(marker.date)}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+        {viewMode === 'map' && selectedMarker && (
+          <BlurView intensity={50} tint="light" style={styles.bottomCardBlur}>
+            <View style={styles.bottomCard}>
+              <Text style={styles.cardTitle}>{selectedMarker.title}</Text>
+              <Text style={styles.cardDescription}>{selectedMarker.description}</Text>
+              <Text style={styles.cardDescription}>Type: {selectedMarker.eventType}</Text>
+              <Text style={styles.cardDescription}>Date: {formatEventDate(selectedMarker.date)}</Text>
+              {selectedMarker.age_range && (
+                <Text style={styles.cardDescription}>
+                  Age Range: {selectedMarker.age_range}
+                </Text>
+              )}
+              {selectedMarker.gender_preference && (
+                <Text style={styles.cardDescription}>
+                  Gender Pref: {selectedMarker.gender_preference}
+                </Text>
+              )}
+              <TouchableOpacity onPress={() => setSelectedMarker(null)}>
+                <Text style={styles.closeButton}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        )}
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => setShowFABMenu(!showFABMenu)}
+        >
+          <Ionicons name="add" size={28} color="#fff" />
+        </TouchableOpacity>
+        {showFABMenu && (
+          <View style={styles.fabMenu}>
+            <TouchableOpacity
+              style={styles.fabMenuItem}
+              onPress={() => {
+                setShowCreateEventModal(true);
+                setShowFABMenu(false);
+              }}
+            >
+              <Text style={styles.fabMenuText}>Create Event</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <Modal
+          isVisible={showCreateEventModal}
+          onBackdropPress={() => setShowCreateEventModal(false)}
+        >
+          <BlurView intensity={50} tint="light" style={styles.modalBlur}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Create New Event</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Title"
+                placeholderTextColor="rgba(0,0,0,0.6)"
+                value={newTitle}
+                onChangeText={setNewTitle}
+              />
+              <TextInput
+                style={[styles.input, { height: 80 }]}
+                placeholder="Description"
+                placeholderTextColor="rgba(0,0,0,0.6)"
+                value={newDescription}
+                onChangeText={setNewDescription}
+                multiline
+              />
+              <TouchableOpacity
+                style={styles.datePickerButton}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Ionicons name="calendar-outline" size={24} color="#333" style={styles.optionIcon} />
+                <Text style={styles.datePickerText}>
+                  {formatEventDate(newDate.toISOString())}
+                </Text>
+              </TouchableOpacity>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={newDate}
+                  mode="date"
+                  display="default"
+                  onChange={handleNewDateChange}
+                  minimumDate={new Date()}
+                />
+              )}
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={newEventType}
+                  onValueChange={(itemValue) => setNewEventType(itemValue)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="SELECT" value={null} />
+                  <Picker.Item label="SPORT" value="sport" />
+                  <Picker.Item label="ONLINE" value="online" />
+                  <Picker.Item label="CULTURAL" value="cultural" />
+                  <Picker.Item label="NETWORKING" value="networking" />
+                </Picker>
+              </View>
+              {newEventType !== 'online' && (
+                <TouchableOpacity
+                  style={styles.selectLocationButton}
+                  onPress={() => setShowLocationPickerModal(true)}
+                >
+                  <Text style={styles.selectLocationText}>
+                    {newEventCoordinates
+                      ? `Location: (${newEventCoordinates.latitude.toFixed(4)}, ${newEventCoordinates.longitude.toFixed(4)})`
+                      : "Select Location"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TextInput
+                style={styles.input}
+                placeholder="Age Range (optional)"
+                placeholderTextColor="rgba(0,0,0,0.6)"
+                value={newAgeRange}
+                onChangeText={setNewAgeRange}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Gender Preference (optional)"
+                placeholderTextColor="rgba(0,0,0,0.6)"
+                value={newGenderPreference}
+                onChangeText={setNewGenderPreference}
+              />
+              <TouchableOpacity style={styles.publishButton} onPress={handlePublishEvent}>
+                <Text style={styles.publishButtonText}>Publish</Text>
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        </Modal>
+        <Modal
+          isVisible={showLocationPickerModal}
+          onBackdropPress={() => setShowLocationPickerModal(false)}
+          style={styles.locationModal}
+        >
+          <BlurView intensity={50} tint="light" style={styles.modalBlur}>
+            <View style={styles.locationModalContent}>
+              <Text style={styles.modalTitle}>Select Event Location</Text>
+              <MapView
+                style={styles.locationMap}
+                initialRegion={
+                  userLocation
+                    ? { ...userLocation, latitudeDelta: 0.0922, longitudeDelta: 0.0421 }
+                    : INITIAL_REGION
+                }
+                onPress={handleMapPressForLocation}
+              >
+                {newEventCoordinates && (
+                  <Marker coordinate={newEventCoordinates} />
+                )}
+              </MapView>
+              <TouchableOpacity
+                style={styles.confirmLocationButton}
+                onPress={() => setShowLocationPickerModal(false)}
+              >
+                <Text style={styles.confirmLocationText}>Confirm Location</Text>
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        </Modal>
+      </View>
+    </LinearGradient>
   );
 };
 
+const primaryBlue = "#5AA9E6";
+const secondaryOrange = "#FFA500";
+
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  moodContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 10,
-    backgroundColor: '#fff',
-  },
-  moodButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 5,
-    backgroundColor: '#fff',
-    borderBottomColor: '#ccc',
-    borderBottomWidth: 1,
-  },
-  moodButtonActive: {
-    backgroundColor: '#4287f5',
-  },
-  moodButtonText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  moodButtonTextActive: {
-    color: '#fff',
+    paddingTop: 10,
   },
   searchBar: {
-    height: 40,
+    height: 45,
     margin: 10,
-    borderColor: '#ccc',
+    borderColor: secondaryOrange,
     borderWidth: 1,
-    borderRadius: 20,
+    borderRadius: 25,
     paddingHorizontal: 15,
-  },
-  viewToggleContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 50,
-    paddingHorizontal: 5,
-    alignItems: 'center',
-    marginRight: 10,
-    alignSelf: 'center',
+    backgroundColor: "rgba(255,255,255,1)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   viewFilterBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    borderBottomWidth: 1,
+    borderColor: "rgba(0,0,0,0.1)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  viewToggle: {
+  viewToggleContainer: {
     flexDirection: 'row',
+    backgroundColor: "rgba(240,240,240,0.8)",
+    borderRadius: 50,
+    paddingHorizontal: 8,
+    alignItems: 'center',
   },
   viewButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 5,
-  },
-  activeViewButton: {
-    backgroundColor: '#4287f5',
-    borderColor: '#4287f5',
+    padding: 6,
   },
   viewButtonText: {
     fontSize: 14,
     color: '#333',
     padding: 5,
   },
-  customMarker: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    // Optional shadow or border for visibility:
-    borderWidth: 1,
-    borderColor: '#fff',
-    // You can also add elevation for Android or shadow for iOS:
-    elevation: 2,
-  },
-  markerTypeText: {
-    fontSize: 12,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
   activeViewButtonText: {
-    color: '#4287f5',
+    color: secondaryOrange,
   },
-  filterButton: {
-    backgroundColor: '#fff',
-    borderRadius: 50,
+  viewIcon: {
+    marginLeft: 5,
   },
-  checkIconContainer: {
-    width: 20, // fixed width container for the check icon
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 6,
-  },
-  // react-native-modal bottom style
-  bottomModal: {
-    margin: 0,
-    justifyContent: 'flex-end', // to appear from bottom
+  divider: {
+    width: 1,
+    height: 24,
+    backgroundColor: "rgba(0,0,0,0.1)",
+    marginHorizontal: 10,
   },
   filterContainer: {
     flexDirection: 'row',
@@ -827,81 +750,44 @@ const styles = StyleSheet.create({
     color: '#333',
     marginRight: 5,
   },
-  markerContainer: {
-    // Optionally adjust the container styling if needed.
-    alignItems: 'center',
-    justifyContent: 'center',
+  filterButton: {
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderRadius: 50,
+    padding: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  markerImage: {
-    width: 40,  // Set desired width
-    height: 40, // Set desired height
-    resizeMode: 'contain',
+  bottomModal: {
+    margin: 0,
+    justifyContent: 'flex-end',
   },
   fullWidthModal: {
-    backgroundColor: '#fff',
-    width: '100%',       // take full width
+    backgroundColor: "rgba(255,255,255,0.9)",
+    width: '100%',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: 16,
-    maxHeight: '70%',    // optional limit
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    backgroundColor: '#4287f5',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 5,
-  },
-  fabMenu: {
-    position: 'absolute',
-    bottom: 90,
-    right: 20,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    elevation: 5,
-  },
-  fabMenuItem: {
-    padding: 10,
-  },
-  fabMenuText: {
-    fontSize: 16,
-    color: '#4287f5',
+    maxHeight: '70%',
   },
   modalTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginBottom: 12,
-  },
-  pickerContainer: {
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 5,
-    marginBottom: 15,
-  },
-  picker: {
-    height: 50,
-    width: '100%',
-    fontSize: 14,
-  },
-  locationModal: {
-    margin: 0,
-    justifyContent: 'center',
-  },
-  locationModalContent: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    height: height * 0.6,
+    color: '#333',
   },
   modalOptionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 8,
+  },
+  checkIconContainer: {
+    width: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
   },
   optionIcon: {
     marginRight: 6,
@@ -910,101 +796,144 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
   },
+  map: {
+    flex: 1,
+  },
   listContainer: {
     flex: 1,
-    padding: 10,
+    padding: 12,
   },
   listItem: {
-    padding: 10,
-    borderBottomColor: '#ccc',
+    padding: 12,
+    borderBottomColor: "rgba(0,0,0,0.1)",
     borderBottomWidth: 1,
+    backgroundColor: "rgba(255,255,255,1)",
+    borderRadius: 8,
+    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   listTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    color: '#333',
   },
   listDescription: {
     fontSize: 14,
     color: '#555',
-  },
-  map: {
-    flex: 1,
-  },
-  bottomCard: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  // Icon for each view button, with a little left margin
-  viewIcon: {
-    marginLeft: 5,
-  },
-  // Vertical divider between the two view buttons
-  divider: {
-    width: 1,
-    height: 24,
-    backgroundColor: '#ccc',
-    marginHorizontal: 10,
   },
   cardDescription: {
     fontSize: 14,
     color: '#666',
     marginBottom: 8,
   },
-  cardInfo: {
-    fontSize: 14,
+  bottomCardBlur: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  bottomCard: {
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    margin: 10,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.1)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     marginBottom: 4,
+    color: '#333',
   },
   closeButton: {
     fontSize: 16,
-    color: '#4287f5',
+    color: secondaryOrange,
     marginTop: 8,
   },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    backgroundColor: secondaryOrange,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  fabMenu: {
+    position: 'absolute',
+    bottom: 90,
+    right: 20,
+    backgroundColor: "rgba(255,255,255,1)",
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  fabMenuItem: {
+    padding: 10,
+  },
+  fabMenuText: {
+    fontSize: 16,
+    color: secondaryOrange,
+  },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: "rgba(255,255,255,0.9)",
     padding: 16,
     borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   input: {
-    height: 40,
-    borderColor: '#ccc',
+    height: 45,
+    borderColor: "rgba(0,0,0,0.2)",
     borderWidth: 1,
-    borderRadius: 5,
-    marginVertical: 6,
+    borderRadius: 8,
+    marginVertical: 8,
     paddingHorizontal: 10,
+    backgroundColor: "rgba(255,255,255,0.9)",
   },
   datePickerButton: {
-    height: 40,
+    height: 45,
     flexDirection: 'row',
     alignItems: 'center',
-    borderColor: '#ccc',
+    borderColor: "rgba(0,0,0,0.2)",
     borderWidth: 1,
-    borderRadius: 5,
-    marginVertical: 6,
+    borderRadius: 8,
+    marginVertical: 8,
     paddingHorizontal: 10,
+    backgroundColor: "rgba(255,255,255,0.9)",
   },
   datePickerText: {
     fontSize: 14,
+    color: '#333',
   },
   publishButton: {
-    backgroundColor: '#4287f5',
+    backgroundColor: primaryBlue,
     padding: 12,
-    borderRadius: 5,
+    borderRadius: 8,
     marginTop: 12,
     alignItems: 'center',
   },
@@ -1012,24 +941,55 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
   },
+  pickerContainer: {
+    borderColor: "rgba(0,0,0,0.2)",
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 12,
+    backgroundColor: "rgba(255,255,255,0.9)",
+  },
+  picker: {
+    height: 50,
+    width: '100%',
+  },
   selectLocationButton: {
-    height: 40,
+    height: 45,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ddd',
-    borderRadius: 5,
-    marginVertical: 6,
+    backgroundColor: "rgba(200,200,200,0.8)",
+    borderRadius: 8,
+    marginVertical: 8,
   },
-  selectLocationText: { fontSize: 14, color: '#333' },
+  selectLocationText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  locationModal: {
+    margin: 0,
+    justifyContent: 'center',
+  },
+  locationModalContent: {
+    backgroundColor: "rgba(255,255,255,0.9)",
+    padding: 16,
+    borderRadius: 12,
+    height: height * 0.6,
+  },
   locationMap: { flex: 1, borderRadius: 12 },
   confirmLocationButton: {
-    backgroundColor: '#4287f5',
+    backgroundColor: primaryBlue,
     padding: 10,
-    borderRadius: 5,
+    borderRadius: 8,
     marginTop: 10,
     alignItems: 'center',
   },
-  confirmLocationText: { color: '#fff', fontSize: 16 },
+  confirmLocationText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  modalBlur: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
 });
 
 export default HomeScreen;

@@ -79,7 +79,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def user_is_allowed(self):
-        print("dzadazda")
         try:
             chat = Chat.objects.get(pk=self.chat_id)
         except Chat.DoesNotExist:
