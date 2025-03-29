@@ -105,7 +105,7 @@ const ChatScreen = () => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+          <Ionicons name="arrow-back" size={24} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chat</Text>
       </View>
@@ -150,11 +150,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1f1f1f',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  headerTitle: { color: '#fff', fontSize: 18, marginLeft: 12 },
+  headerTitle: { fontSize: 18, marginLeft: 12 },
   filterContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',

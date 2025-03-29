@@ -47,7 +47,7 @@ export default function ProtectedLayout() {
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarShowLabel: false,
-        tabBarActiveTintColor: "#4287f5",
+        tabBarActiveTintColor: "#153b8e",
         tabBarInactiveTintColor: "gray",
         headerShown: false,
       })}

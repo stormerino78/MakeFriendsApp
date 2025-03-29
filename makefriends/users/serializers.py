@@ -25,6 +25,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     location = serializers.JSONField(required=False, write_only=True)
     # And a separate read-only field for output
     location_display = serializers.SerializerMethodField(read_only=True)
+    anonymous = serializers.BooleanField(default=False)
 
     class Meta:
         model = UserProfile
@@ -42,7 +43,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "profile_picture",
             "mood",
             "location",
-            "location_display"  # read-only output field
+            "location_display",  # read-only output field
+            "anonymous"
         ]
 
     def validate_username(self, value):

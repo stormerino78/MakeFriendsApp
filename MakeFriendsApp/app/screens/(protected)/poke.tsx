@@ -9,6 +9,7 @@ import {
   Image, 
   Alert 
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -20,20 +21,40 @@ const BACKEND_URL = config.url;
 type NearbyUser = {
   user_id: number;
   name: string;
+  dateOfBirth_str: string;
   profile_picture?: string;
   mood: string;
   location_display?: {
     type: string;
     coordinates: [number, number];
   };
+  anonymous?: boolean; // Indicates if the user is in anonymous mode.
 };
+
+// Custom hook to debounce a value
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debouncedValue;
+}
 
 const PokeScreen = () => {
   const router = useRouter();
+  const [allNearbyUsers, setAllNearbyUsers] = useState<NearbyUser[]>([]);
   const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [userMood, setUserMood] = useState<string>("");
   const [transparentMode, setTransparentMode] = useState(false);
+  const [maxRange, setMaxRange] = useState<number>(10); // Range in km
+  const [sliderValue, setSliderValue] = useState<number>(0); // Live value for the slider
+
+  // Debounce the maxRange value so filtering happens only after slider settles
+  const debouncedMaxRange = useDebounce(maxRange, 500);
 
   // Get user's current location
   useEffect(() => {
@@ -83,7 +104,7 @@ const PokeScreen = () => {
     })();
   }, []);
   
-  // Fetch the current user's profile to get their mood
+  // Fetch the current user's profile to get their mood and anonymous flag.
   useEffect(() => {
     (async () => {
       try {
@@ -103,6 +124,8 @@ const PokeScreen = () => {
         if (response.ok) {
           const data = await response.json();
           setUserMood((data.mood || "").toLowerCase());
+          // Set the switch state based on the user's anonymous flag.
+          setTransparentMode(data.anonymous);
         } else {
           Alert.alert("Error", "Failed to fetch profile");
         }
@@ -112,7 +135,7 @@ const PokeScreen = () => {
     })();
   }, []);
 
-  // Fetch nearby users from backend
+  // Fetch nearby users from backend and store them in allNearbyUsers.
   useEffect(() => {
     (async () => {
       try {
@@ -122,8 +145,6 @@ const PokeScreen = () => {
           router.push('/screens/login');
           return;
         }
-        // Assuming your backend has an endpoint for nearby users.
-        // You might want to pass the current location as query parameters.
         const response = await fetch(`${BACKEND_URL}/api/nearby-users/`, {
           method: 'GET',
           headers: {
@@ -133,12 +154,7 @@ const PokeScreen = () => {
         });
         if (response.ok) {
           const data: NearbyUser[] = await response.json();
-          let filtered = data;
-          // Optionally filter by mood if set
-          if (userMood) {
-            filtered = filtered.filter(user => user.mood.toLowerCase() === userMood);
-          }
-          setNearbyUsers(filtered);
+          setAllNearbyUsers(data);
         } else {
           Alert.alert("Error", "Failed to fetch nearby users");
         }
@@ -146,7 +162,62 @@ const PokeScreen = () => {
         Alert.alert("Error", error.toString());
       }
     })();
-  }, [userMood]);
+  }, [router]);
+
+  // Filter nearby users based on mood, anonymous flag, and distance.
+  useEffect(() => {
+    let filtered = allNearbyUsers;
+    if (userMood) {
+      filtered = filtered.filter(user => user.mood.toLowerCase() === userMood);
+    }
+    // When anonymous mode is disabled, only show users who have also disabled anonymous mode.
+    if (!transparentMode) {
+      filtered = filtered.filter(user => !user.anonymous);
+    }
+    if (userLocation) {
+      filtered = filtered.filter(user => {
+        if (user.location_display && user.location_display.coordinates && user.location_display.coordinates.length === 2) {
+          const [lon, lat] = user.location_display.coordinates;
+          const distance = getDistanceFromLatLonInKm(
+            userLocation.latitude,
+            userLocation.longitude,
+            lat,
+            lon
+          );
+          return distance <= debouncedMaxRange;
+        }
+        return false;
+      });
+    }
+    setNearbyUsers(filtered);
+  }, [allNearbyUsers, userMood, transparentMode, userLocation, debouncedMaxRange]);
+
+  // Update the current user's anonymous flag on the backend
+  const updateAnonymousFlag = async (newValue: boolean) => {
+    try {
+      const token = await AsyncStorage.getItem('access_token');
+      if (!token) {
+        Alert.alert("Error", "Not logged in");
+        router.push('/screens/login');
+        return;
+      }
+      const response = await fetch(`${BACKEND_URL}/api/users/me/`, {
+        method: 'PATCH',
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ anonymous: newValue }),
+      });
+      if (!response.ok) {
+        Alert.alert("Error", "Failed to update anonymous flag");
+      } else {
+        console.log("Anonymous flag updated successfully");
+      }
+    } catch (error: any) {
+      Alert.alert("Error", error.toString());
+    }
+  };
 
   // Helper function: Haversine formula for distance in km.
   const getDistanceFromLatLonInKm = (
@@ -164,6 +235,17 @@ const PokeScreen = () => {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
+  
+  const calculateAge = (dateOfBirth: string) => {
+    const birthDate = new Date(dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age < 0 ? 0 : age;
+  };
 
   const handlePoke = async (user: NearbyUser) => {
     try {
@@ -179,10 +261,10 @@ const PokeScreen = () => {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ target_id: user.user_id })  // use user_id instead of id
+        body: JSON.stringify({ target_id: user.user_id })
       });
       if (response.ok) {
-        const data = await response.json();
+        await response.json();
         setNearbyUsers(prev => prev.filter(u => u.user_id !== user.user_id));
         router.push('/screens/chat');
       } else {
@@ -195,13 +277,13 @@ const PokeScreen = () => {
 
   const renderUserItem = ({ item }: { item: NearbyUser }) => {
     let distanceText = "";
+    const age = calculateAge(item.dateOfBirth_str);
     if (
       userLocation &&
       item.location_display &&
       item.location_display.coordinates &&
       item.location_display.coordinates.length === 2
     ) {
-      // Extract coordinates from location_display
       const [lon, lat] = item.location_display.coordinates;
       const distance = getDistanceFromLatLonInKm(
         userLocation.latitude,
@@ -211,48 +293,96 @@ const PokeScreen = () => {
       );
       distanceText = `${distance.toFixed(1)} km away`;
     }
-    return (
-      <View style={styles.userItem}>
-        {item.profile_picture ? (
-          <Image source={{ uri: item.profile_picture }} style={styles.userImage} />
-        ) : (
+
+    if (transparentMode) {
+      return (
+        <View style={styles.userItem}>
           <View style={[styles.userImage, styles.userPlaceholder]}>
-            <Text style={styles.userPlaceholderText}>{item.name.charAt(0)}</Text>
+            <Text style={styles.userPlaceholderText}>A</Text>
           </View>
-        )}
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>{item.name}</Text>
-          <Text style={styles.userMood}>{item.mood}</Text>
-          {distanceText !== "" && (
-            <Text style={styles.userDistance}>{distanceText}</Text>
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>Anonymous</Text>
+            <Text style={styles.userAge}>{age}</Text>
+            <Text style={styles.userMood}>{item.mood}</Text>
+            {distanceText !== "" && (
+              <Text style={styles.userDistance}>{distanceText}</Text>
+            )}
+          </View>
+          <View style={styles.actions}>
+            <TouchableOpacity style={styles.pokeButton} onPress={() => handlePoke(item)}>
+              <Text style={styles.pokeButtonText}>Poke</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    } else {
+      return (
+        <View style={styles.userItem}>
+          {item.profile_picture ? (
+            <Image source={{ uri: item.profile_picture }} style={styles.userImage} />
+          ) : (
+            <View style={[styles.userImage, styles.userPlaceholder]}>
+              <Text style={styles.userPlaceholderText}>{item.name.charAt(0)}</Text>
+            </View>
           )}
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{item.name}</Text>
+            <Text style={styles.userAge}>{age}</Text>
+            <Text style={styles.userMood}>{item.mood}</Text>
+            {distanceText !== "" && (
+              <Text style={styles.userDistance}>{distanceText}</Text>
+            )}
+          </View>
+          <View style={styles.actions}>
+            <TouchableOpacity style={styles.pokeButton} onPress={() => handlePoke(item)}>
+              <Text style={styles.pokeButtonText}>Poke</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.pokeButton} onPress={() => handlePoke(item)}>
-            <Text style={styles.pokeButtonText}>Poke</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
+      );
+    }
   };
 
   return (
     <View style={styles.container}>
-      {/* Header with Title and Chat Icon */}
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Poke Nearby Users</Text>
         <TouchableOpacity onPress={() => router.push('/screens/chat')}>
-          <Ionicons name="chatbubble-ellipses-outline" size={28} color="#fff" />
+          <Ionicons name="chatbubble-ellipses-outline" size={28} />
         </TouchableOpacity>
       </View>
 
-      {/* Transparent Mode Toggle */}
+      {/* Anonymous Mode Toggle */}
       <View style={styles.transparentContainer}>
-        <Text style={styles.transparentLabel}>Transparent Mode</Text>
+        <Text style={styles.transparentLabel}>Anonymous Mode</Text>
         <Switch 
           value={transparentMode} 
-          onValueChange={setTransparentMode} 
-          trackColor={{ false: '#ccc', true: '#4287f5' }}
+          onValueChange={(value) => {
+            setTransparentMode(value);
+            updateAnonymousFlag(value);
+            if (!value) {
+              setNearbyUsers(prev => prev.filter(user => !user.anonymous));
+            }
+          }} 
+          trackColor={{ false: '#ccc', true: '#153b8e' }}
+        />
+      </View>
+
+      {/* Slider to control detection range */}
+      <View style={styles.sliderContainer}>
+        <Text style={styles.sliderLabel}>Detection Range: {sliderValue} km</Text>
+        <Slider
+          style={{ width: '100%', height: 40 }}
+          minimumValue={0}
+          maximumValue={100}
+          step={1}
+          value={maxRange}
+          onValueChange={(value) => setSliderValue(value)}
+          onSlidingComplete={(value) => setMaxRange(value)}
+          minimumTrackTintColor="#153b8e"
+          thumbTintColor = '#eb9800'
+          maximumTrackTintColor="#ccc"
         />
       </View>
 
@@ -274,29 +404,43 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#1f1f1f',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  headerTitle: { color: '#fff', fontSize: 18 },
+  headerTitle: { fontSize: 18 },
   transparentContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#1f1f1f',
   },
-  transparentLabel: { color: '#fff', fontSize: 14 },
+  transparentLabel: { fontSize: 14 },
+  sliderContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  sliderLabel: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
   listContent: { padding: 16 },
   userItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    backgroundColor: '#f0f0f0',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomColor: "rgba(0,0,0,0.1)",
+    borderBottomWidth: 1,
     padding: 12,
-    borderRadius: 8,
+    marginBottom: 8,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
+    elevation: 2,
   },
   userImage: {
     width: 50,
@@ -313,17 +457,21 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  userInfo: { flex: 1, marginLeft: 12 },
+  userInfo: { flex: 1, marginLeft: 8 },
   userName: { fontSize: 16, fontWeight: 'bold' },
+  userAge: { fontSize: 14 },
   userMood: { fontSize: 14, color: '#666' },
   userDistance: { fontSize: 12, color: '#888', marginTop: 4 },
   actions: { flexDirection: 'row', alignItems: 'center' },
   pokeButton: {
-    backgroundColor: '#4287f5',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-    marginRight: 10,
+    backgroundColor: "#fcb900",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
   },
-  pokeButtonText: { color: '#fff', fontSize: 14 },
+  pokeButtonText: {
+    fontSize: 14,
+    color: "#fff",
+    fontWeight: "bold",
+  },
 });

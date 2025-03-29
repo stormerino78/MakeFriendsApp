@@ -360,12 +360,11 @@ const HomeScreen = () => {
             </TouchableOpacity>
           </View>
           <View style={styles.filterContainer}>
-            <Text style={styles.filterLabel}>Filtrer</Text>
             <TouchableOpacity
               style={styles.filterButton}
               onPress={() => setShowFilter(!showFilter)}
             >
-              <Ionicons name="filter-circle-outline" size={34} color={secondaryOrange} />
+              <Ionicons name="filter-circle-outline" size={34} color={primaryBlue} />
             </TouchableOpacity>
           </View>
         </View>
@@ -672,8 +671,8 @@ const HomeScreen = () => {
   );
 };
 
-const primaryBlue = "#5AA9E6";
-const secondaryOrange = "#FFA500";
+const primaryBlue = "#153b8e";
+const secondaryOrange = "#eb9800";
 
 const styles = StyleSheet.create({
   gradient: {
@@ -686,7 +685,7 @@ const styles = StyleSheet.create({
   searchBar: {
     height: 45,
     margin: 10,
-    borderColor: secondaryOrange,
+    borderColor: primaryBlue,
     borderWidth: 1,
     borderRadius: 25,
     paddingHorizontal: 15,
@@ -809,7 +808,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     backgroundColor: "rgba(255,255,255,1)",
     borderRadius: 8,
-    marginBottom: 10,
+    marginBottom: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
