@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from './config.json';
+import { apiFetch } from './_authHelper';
 
 const BACKEND_URL = config.url;
 
@@ -19,8 +20,30 @@ const ProfileMenuScreen = () => {
   
   // State to store profile data (name and profile picture)
   const [name, setName] = useState('');
-  const [username, setUsername] = useState('');
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
+
+  // Disconnect function: clear tokens and redirect to login screen.
+  const handleDisconnect = async () => {
+    try {
+      await AsyncStorage.removeItem('access_token');
+      await AsyncStorage.removeItem('refresh_token');
+      router.push('/screens/login');
+    } catch (error: any) {
+      Alert.alert("Error", error.toString());
+    }
+  };
+
+  // Show confirmation popup before disconnecting.
+  const confirmDisconnect = () => {
+    Alert.alert(
+      "Confirm Disconnection",
+      "Are you sure you want to disconnect?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Disconnect", style: "destructive", onPress: handleDisconnect }
+      ]
+    );
+  };
 
   // Fetch the profile data on mount
   useEffect(() => {
@@ -32,7 +55,7 @@ const ProfileMenuScreen = () => {
           router.push('/screens/login');
           return;
         }
-        const response = await fetch(`${BACKEND_URL}/api/users/me/`, {
+        const response = await apiFetch(`${BACKEND_URL}/api/users/me/`, {
           method: 'GET',
           headers: {
             "Content-Type": "application/json",
@@ -93,6 +116,12 @@ const ProfileMenuScreen = () => {
       icon: 'lock-closed-outline',
       onPress: () => Alert.alert('Privacy Pressed'),
     },
+    {
+      key: 'disconnect',
+      label: 'Disconnect',
+      icon: 'log-out-outline',
+      onPress: confirmDisconnect,
+    },
   ];
 
   return (
@@ -115,8 +144,15 @@ const ProfileMenuScreen = () => {
         keyExtractor={(item) => item.key}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.menuItem} onPress={item.onPress}>
-            <Ionicons name={item.icon} size={24} style={styles.menuItemIcon} />
-            <Text style={styles.menuItemLabel}>{item.label}</Text>
+            <Ionicons name={item.icon} size={24} style={[
+                styles.menuItemIcon,
+                item.key === 'disconnect' && { color: 'red' },
+              ]} />
+            <Text style={[
+                styles.menuItemLabel,
+                item.key === 'disconnect' && { color: 'red' },
+              ]}
+              >{item.label}</Text>
           </TouchableOpacity>
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}

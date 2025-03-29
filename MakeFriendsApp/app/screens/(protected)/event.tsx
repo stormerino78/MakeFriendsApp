@@ -21,6 +21,7 @@ import { Picker } from '@react-native-picker/picker';
 import config from './config.json';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { apiFetch } from './_authHelper';
 
 const BACKEND_URL = config.url;
 
@@ -130,7 +131,7 @@ const HomeScreen = () => {
         return;
       }
       // GET request to the events endpoint with the authentification token
-      const response = await fetch(`${BACKEND_URL}/api/events/`, {
+      const response = await apiFetch(`${BACKEND_URL}/api/events/`, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -251,7 +252,7 @@ const HomeScreen = () => {
         router.push('/');
         return;
       }
-      const response = await fetch(`${BACKEND_URL}/api/events/`, {
+      const response = await apiFetch(`${BACKEND_URL}/api/events/`, {
         method: 'POST',
         headers: {
           "Content-Type": "application/json",

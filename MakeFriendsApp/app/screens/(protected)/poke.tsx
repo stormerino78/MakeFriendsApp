@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from './config.json';
+import { apiFetch } from './_authHelper';
 
 const BACKEND_URL = config.url;
 
@@ -79,7 +80,7 @@ const PokeScreen = () => {
           router.push('/screens/login');
           return;
         }
-        const patchResponse = await fetch(`${BACKEND_URL}/api/users/me/`, {
+        const patchResponse = await apiFetch(`${BACKEND_URL}/api/users/me/`, {
           method: 'PATCH',
           headers: {
             "Content-Type": "application/json",
@@ -114,7 +115,7 @@ const PokeScreen = () => {
           router.push('/screens/login');
           return;
         }
-        const response = await fetch(`${BACKEND_URL}/api/users/me/`, {
+        const response = await apiFetch(`${BACKEND_URL}/api/users/me/`, {
           method: 'GET',
           headers: {
             "Content-Type": "application/json",
@@ -145,7 +146,7 @@ const PokeScreen = () => {
           router.push('/screens/login');
           return;
         }
-        const response = await fetch(`${BACKEND_URL}/api/nearby-users/`, {
+        const response = await apiFetch(`${BACKEND_URL}/api/nearby-users/`, {
           method: 'GET',
           headers: {
             "Content-Type": "application/json",
@@ -201,7 +202,7 @@ const PokeScreen = () => {
         router.push('/screens/login');
         return;
       }
-      const response = await fetch(`${BACKEND_URL}/api/users/me/`, {
+      const response = await apiFetch(`${BACKEND_URL}/api/users/me/`, {
         method: 'PATCH',
         headers: {
           "Content-Type": "application/json",
@@ -255,7 +256,7 @@ const PokeScreen = () => {
         router.push('/screens/login');
         return;
       }
-      const response = await fetch(`${BACKEND_URL}/api/poke/`, {
+      const response = await apiFetch(`${BACKEND_URL}/api/poke/`, {
         method: 'POST',
         headers: {
           "Content-Type": "application/json",

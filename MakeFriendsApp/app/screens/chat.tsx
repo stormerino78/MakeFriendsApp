@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from './(protected)/config.json';
+import { apiFetch } from './(protected)/_authHelper';
 
 const BACKEND_URL = config.url;
 
@@ -31,7 +32,7 @@ const ChatScreen = () => {
 
   const getLastMessageForChat = async (chat: ChatItem, token: string, currentUserId: string) => {
     try {
-      const messagesResponse = await fetch(`${BACKEND_URL}/api/chats/${chat.id}/messages/`, {
+      const messagesResponse = await apiFetch(`${BACKEND_URL}/api/chats/${chat.id}/messages/`, {
         method: 'GET',
         headers: {
           "Content-Type": "application/json",
@@ -59,7 +60,7 @@ const ChatScreen = () => {
         router.push('/screens/login');
         return;
       }
-      const response = await fetch(`${BACKEND_URL}/api/chats/me/`, {
+      const response = await apiFetch(`${BACKEND_URL}/api/chats/me/`, {
         method: 'GET',
         headers: {
           "Content-Type": "application/json",

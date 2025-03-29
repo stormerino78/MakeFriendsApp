@@ -6,6 +6,7 @@ import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import config from './(protected)/config.json';
+import { apiFetch } from './(protected)/_authHelper';
 
 const BACKEND_URL = config.url;
 
@@ -75,7 +76,7 @@ const RegistrationScreen = () => {
     // Send request to the register endpoint to register a new user
     try {
       console.log(JSON.stringify(payload))
-      const response = await fetch(`${BACKEND_URL}/register/`, {
+      const response = await apiFetch(`${BACKEND_URL}/register/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

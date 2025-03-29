@@ -18,6 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import config from './(protected)/config.json';
 import { LinearGradient } from 'expo-linear-gradient';
+import { apiFetch } from './(protected)/_authHelper';
 
 const BACKEND_URL = config.url;
 
@@ -54,7 +55,7 @@ const AccountScreen = () => {
           return;
         }
         // Fetch profile from api/users/me/ endpoint using the token for authentication
-        const response = await fetch(`${BACKEND_URL}/api/users/me/`, {
+        const response = await apiFetch(`${BACKEND_URL}/api/users/me/`, {
           method: 'GET',
           headers: {
             "Content-Type": "application/json",
@@ -158,7 +159,7 @@ const AccountScreen = () => {
 
       // PATCH request to update the profile
       // NB not Content-Type header when sending FormData
-      const response = await fetch(`${BACKEND_URL}/api/users/me/`, {
+      const response = await apiFetch(`${BACKEND_URL}/api/users/me/`, {
         method: 'PATCH',
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -185,7 +186,7 @@ const AccountScreen = () => {
       >
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.push('/screens/(protected)/profile')}>
-            <Ionicons name="arrow-back" size={24} color={secondaryOrange} />
+            <Ionicons name="arrow-back" size={24} color={"#153b8e"} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Account</Text>
         </View>
@@ -350,7 +351,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 15,
     borderWidth: 1,
-    borderColor: secondaryOrange,
+    borderColor: "#153b8e",
   },
   imagePickerButton: {
     backgroundColor: "rgba(255,255,255,0.9)",

@@ -32,7 +32,8 @@ const LoginScreen = () => {
         console.log("Login successful:", data);
         // Save the token for the next requests to remain authentificated through asyncStorage
         await AsyncStorage.setItem('access_token', data.access);
-        console.log("Login successful, token saved:", data.access);
+        await AsyncStorage.setItem('refresh_token', data.refresh);
+        console.log("Login successful, token saved");
         // Navigate to the poke screen.
         router.push('/screens/(protected)/poke');
       } else {

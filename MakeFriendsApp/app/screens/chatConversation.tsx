@@ -16,6 +16,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { v4 as uuidv4 } from 'uuid';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { apiFetch, refreshAccessToken } from './(protected)/_authHelper';
 
 const BACKEND_URL = config.url;
 
@@ -47,7 +48,7 @@ const ChatConversation = () => {
           router.push('/screens/login');
           return;
         }
-        const response = await fetch(`${BACKEND_URL}/api/users/me/`, {
+        const response = await apiFetch(`${BACKEND_URL}/api/users/me/`, {
           method: 'GET',
           headers: {
             "Content-Type": "application/json",
@@ -78,7 +79,7 @@ const ChatConversation = () => {
         router.push('/screens/login');
         return;
       }
-      const response = await fetch(`${BACKEND_URL}/api/chats/${chat_id}/messages/`, {
+      const response = await apiFetch(`${BACKEND_URL}/api/chats/${chat_id}/messages/`, {
         method: 'GET',
         headers: {
           "Content-Type": "application/json",
@@ -108,7 +109,7 @@ const ChatConversation = () => {
   useEffect(() => {
     (async () => {
       if (!chat_id) return;
-      const token = await AsyncStorage.getItem('access_token');
+      let token = await AsyncStorage.getItem('access_token');
       if (!token) {
         Alert.alert("Error", "Not logged in");
         router.push('/screens/login');
@@ -149,8 +150,22 @@ const ChatConversation = () => {
         const errorEvent = e as ErrorEvent;
         console.error('WebSocket error:', errorEvent.message);
       };
-      ws.onclose = (e) => {
+      ws.onclose = async (e) => {
         console.log('WebSocket closed:', e.code, e.reason);
+        // If the token is expire try refreshing the token and reconnect.
+        if (e.code === 4001 || (e.reason && e.reason.toLowerCase().includes('token'))) {
+          try {
+            token = await refreshAccessToken();
+            // Reconnect with the new token:
+            const newWsUrl = `${wsProtocol}://${baseUrl}/ws/chats/${chat_id}/?token=${token}`;
+            const newWs = new WebSocket(newWsUrl);
+            // Reassign new Ws to the socket state or ref as needed
+            console.log('Reconnected WebSocket with refreshed token');
+          } catch (error) {
+            Alert.alert("Session expired", "Please log in again.");
+            router.push('/screens/login');
+          }
+        }
       };
       socketRef.current = ws;
       return () => {
